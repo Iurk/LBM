@@ -67,7 +67,6 @@ for step in range(maxiter):
     fout = LBM.collision_step(feq, fneq, tau)
     
     rho, u, fout = LBM.zou_he_entrada(u, rho, u_entrada, fout)
-#    rho, u, fout = LBM.zou_he_saida(u, rho, u_entrada, fout)
     fout = LBM.outflow_saida(fout)
     fout = LBM.bounce_back(fout, Ly, 'Superior')
     fout = LBM.bounce_back(fout, Ly, 'Inferior')
@@ -75,11 +74,6 @@ for step in range(maxiter):
     fout = LBM.condicao_solido(f, fout, solido, n)
     
     f = LBM.transmissao(f, fout, Lx, Ly)
-    
-#    f = LBM.new_transmissao(f, fout, n)
-    
-#    for i in range(n):
-#        f[i,:,:] = np.roll(np.roll(fout[i,:,:], e[i,0], axis=0), e[i,1], axis=1)
     
     if (step % 500 == 0): print('Step -> {}'.format(step))
     
