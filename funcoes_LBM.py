@@ -69,7 +69,6 @@ def u(e, f, rho, n, X, Y):
             for k in range(n):
                 u[0,i,j] += e[k,0]*f[k,i,j]
                 u[1,i,j] += e[k,1]*f[k,i,j]
-
     u = u/rho
     return u
         
@@ -96,7 +95,7 @@ def dist_eq(rho, u, e, W, cs, n, X, Y):
         
     feq = np.zeros((n, X, Y))
     for i in range(n):
-        feq[i,:,:] = W[i]*rho*(1 + (1/cs**2)*A[i] + (1/(2*cs**2))*B[i])
+        feq[i,:,:] = W[i]*rho*(1 + (1/cs**2)*A[i] + (1/(2*cs**4))*B[i])
     return feq
 
 # Distribuição de Não Equilíbrio
