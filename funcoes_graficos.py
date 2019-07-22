@@ -12,8 +12,9 @@ def grafico(u, step):
     
     file = 'vel.' + str(step) + '.png'
     path = 'Simulacao' + '/%s' % file
-    image = plot(u)
-    image.savefig(path, dpi=250)
+    plt.clf()
+    plt.imshow(u, cmap='RdBu', interpolation='nearest')
+    plt.savefig(path, dpi=250)
     
 def plot(u):
     graph = plt.figure()

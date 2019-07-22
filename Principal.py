@@ -23,13 +23,17 @@ Cy = Ly/2   # Centro do Cilindro em y [Lattice units]
 r = Ly/10    # Raio do Cilindro [Lattice units]
 
 Re = 220    # Reynolds Number
-Uini = 5
+Uini = 1
 
 maxiter = 3000    # Número de Iterações
 
+#***** Data Visualization *****
+animation = False
+image = True
+
 #***** LBM Parameters *****
 n = 9                       # Número de Direções do Lattice
-c = 2e2                     # Lattice speed
+c = 25                   # Lattice speed
 cs = 1/np.sqrt(3)           # Velocidade do Som em unidades Lattice
 tau, omega = LBM.relaxation_parameter(Re, r, Lx, Ly, c, Uini)
 
@@ -68,8 +72,8 @@ for step in range(maxiter):
     
     rho, u, fout = LBM.zou_he_entrada(u, rho, u_entrada, fout)
     fout = LBM.outflow_saida(fout)
-    fout = LBM.bounce_back(fout, Ly, 'Superior')
-    fout = LBM.bounce_back(fout, Ly, 'Inferior')
+#    fout = LBM.bounce_back(f, Ly, 'Superior')
+#    fout = LBM.bounce_back(f, Ly, 'Inferior')
     
     fout = LBM.condicao_solido(f, fout, solido, n)
     
@@ -77,16 +81,19 @@ for step in range(maxiter):
     
     if (step % 500 == 0): print('Step -> {}'.format(step))
     
-    if (step % 100 == 0):
-        u_mod = modulo_velocidade(u)
-        fg.grafico(u_mod, step)
-        
-    if (step % 10 == 0):
-        u_mod = modulo_velocidade(u)
-        ims = fg.images(u_mod, ims=ims)
+    if image:
+        if (step % 100 == 0):
+            u_mod = modulo_velocidade(u)
+            fg.grafico(u_mod, step)
+    
+    if animation:
+        if (step % 10 == 0):
+            u_mod = modulo_velocidade(u)
+            ims = fg.images(u_mod, ims=ims)
 
 print('Animating...')
-fg.save_animation(fig, ims)
+if animation:
+    fg.save_animation(fig, ims)
 print('Done!')
 fim = time()
 delta_t = fim - ini
