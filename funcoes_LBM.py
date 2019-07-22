@@ -141,7 +141,17 @@ def transmissao(f, fout, X, Y):
     f[6,0:X-1,0:Y-1] = fout[6,1:X,1:Y]
     f[7,0:X-1,1:Y] = fout[7,1:X,0:Y-1]
     f[8,1:X,1:Y] = fout[8,0:X-1,0:Y-1]
-    return f    
+    return f
+
+def new_transmissao(f, fout, n):
+    ex_roll = np.array([0, 1, 0, -1, 0, 1, -1, -1, 1])
+    ey_roll = np.array([0, 0, -1, 0, 1, -1, -1, 1, 1])
+    e_roll = np.stack((ex_roll, ey_roll), axis=1)
+    
+    for i in range(n):
+        f[i,:,:] = np.roll(np.roll(fout[i,:,:], e_roll[i,0], axis=1), e_roll[i,1], axis=0)
+    return f
+    
 
 def zou_he_entrada(u, rho, u_entrada, f):
     u[:,0,:] = u_entrada[:,0,:]
