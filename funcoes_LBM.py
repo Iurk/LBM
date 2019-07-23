@@ -49,7 +49,6 @@ def velocidade_lattice_units(x, y, X, Y, c, Uini, mode='Default'):
         for i in range(X):
             for j in range(Y):
                 U[0,i,j] = Uini
-    
     u = U/c
     return u
 
@@ -57,21 +56,10 @@ def velocidade_lattice_units(x, y, X, Y, c, Uini, mode='Default'):
 def cilindro(x, y, Cx, Cy, r):
     return (x - Cx)**2 + (y - Cy)**2 < r**2
 
-# Rho e u
-def sum_directions(f):
+# Rho
+def rho(f):
     return np.sum(f, axis=0)
 
-def u(e, f, rho, n, X, Y):
-    u = np.zeros((2, X, Y))
-    
-    for i in range(X):
-        for j in range(Y):
-            for k in range(n):
-                u[0,i,j] += e[k,0]*f[k,i,j]
-                u[1,i,j] += e[k,1]*f[k,i,j]
-    u = u/rho
-    return u
-        
 # Distribuição de Equilíbrio
 def dist_eq(rho, u, e, W, cs, n, X, Y):
     delab = np.array([[1,0],[0,1]])
@@ -140,17 +128,7 @@ def transmissao(f, fout, X, Y):
     f[6,0:X-1,0:Y-1] = fout[6,1:X,1:Y]
     f[7,0:X-1,1:Y] = fout[7,1:X,0:Y-1]
     f[8,1:X,1:Y] = fout[8,0:X-1,0:Y-1]
-    return f
-
-def new_transmissao(f, fout, n):
-    ex_roll = np.array([0, 1, 0, -1, 0, 1, -1, -1, 1])
-    ey_roll = np.array([0, 0, -1, 0, 1, -1, -1, 1, 1])
-    e_roll = np.stack((ex_roll, ey_roll), axis=1)
-    
-    for i in range(n):
-        f[i,:,:] = np.roll(np.roll(fout[i,:,:], e_roll[i,0], axis=1), e_roll[i,1], axis=0)
-    return f
-    
+    return f   
 
 def zou_he_entrada(u, rho, u_entrada, f):
     u[:,0,:] = u_entrada[:,0,:]
@@ -161,15 +139,11 @@ def zou_he_entrada(u, rho, u_entrada, f):
     f[8,0,:] = f[6,0,:] + (1/2)*(f[2,0,:] - f[4,0,:]) + (1/6)*rho[0,:]*u[0,0,:]
     return rho, u, f
 
-def zou_he_saida(u, rho, u_entrada, f):
-    u[:,:,-1] = u_entrada[:,:,0]
-    rho[:,-1] = (f[0,:,-1] + f[2,:,-1] + f[4,:,-1] + 2*(f[1,:,-1] + f[5,:,-1] + f[8,:,-1]))/(1 + u[0,:,-1])
-    
-    f[3,:,-1] = f[1,:,-1] - (2/3)*rho[:,-1]*u[0,:,-1]
-    f[6,:,-1] = f[8,:,-1] - (1/2)*(f[2,:,-1] - f[4,:,-1]) - (1/6)*rho[:,-1]*u[0,:,-1]
-    f[7,:,-1] = f[5,:,-1] + (1/2)*(f[2,:,-1] - f[4,:,-1]) - (1/6)*rho[:,-1]*u[0,:,-1]
-    return rho, u, f
-    
+def outflow_saida(f):
+    unknow = [3,6,7]
+    f[unknow,-1,:] = f[unknow,-2,:]
+    return f
+
 def bounce_back(f, Y, parede):
     if parede == 'Superior':
         f[4,:,Y-1] = f[2,:,Y-1]
@@ -180,11 +154,6 @@ def bounce_back(f, Y, parede):
         f[2,:,0] = f[4,:,0]
         f[5,:,0] = f[7,:,0]
         f[6,:,0] = f[8,:,0]
-    return f
-
-def outflow_saida(f):
-    unknow = [3,6,7]
-    f[unknow,-1,:] = f[unknow,-2,:]
     return f
 
 def condicao_solido(f, fout, solido, n):
