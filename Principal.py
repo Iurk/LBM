@@ -15,8 +15,8 @@ def modulo_velocidade(u):
     return np.linalg.norm(u, axis=0).transpose()
 
 #***** Entrada de Dados *****
-Lx = 700    # Dimensão em x [Lattice units]
-Ly = 200    # Dimensão em y [Lattice units]
+Lx = 1000    # Dimensão em x [Lattice units]
+Ly = 500    # Dimensão em y [Lattice units]
 
 Cx = Lx/4   # Centro do Cilindro em x [Lattice units]
 Cy = Ly/2   # Centro do Cilindro em y [Lattice units]
@@ -25,7 +25,8 @@ r = Ly/10    # Raio do Cilindro [Lattice units]
 Re = 220    # Reynolds Number
 Uini = 1
 
-maxiter = 3000    # Número de Iterações
+maxiter = 10000    # Número de Iterações
+tol = 1e-5
 
 #***** Data Visualization *****
 animation = False
@@ -33,7 +34,7 @@ image = True
 
 #***** LBM Parameters *****
 n = 9                       # Número de Direções do Lattice
-c = 25                   # Lattice speed
+c = 250                   # Lattice speed
 cs = 1/np.sqrt(3)           # Velocidade do Som em unidades Lattice
 tau, omega = LBM.relaxation_parameter(Re, r, Lx, Ly, c, Uini)
 
@@ -50,6 +51,7 @@ y = np.arange(0, Ly)
 #***** Construção do Cilindro e Perfil de Velocidades *****
 solido = np.array([LBM.cilindro(i, y, Cx, Cy, r) for i in x])
 u_entrada = LBM.velocidade_lattice_units(x, y, Lx, Ly, c, Uini)
+u_erro = np.ones((2, Lx, Ly))
 
 #***** Inicialização *****
 print('Initializing')
@@ -59,9 +61,9 @@ f = feq.copy()
 fig, ims = fg.create_animation()
 
 print('Running...')
-#***** Main Loop *****
-for step in range(maxiter):
-    rho = LBM.sum_directions(f)
+step = 0
+while True:
+    rho = LBM.rho(f)
     u = np.dot(e.transpose(), f.transpose(1,0,2))/rho
     
     feq = LBM.dist_eq(rho, u, e, W, cs, n, Lx, Ly)
@@ -70,16 +72,16 @@ for step in range(maxiter):
     fneq = LBM.dist_neq(tauab, e, W, cs, n, Lx, Ly)
     fout = LBM.collision_step(feq, fneq, tau)
     
-    rho, u, fout = LBM.zou_he_entrada(u, rho, u_entrada, fout)
+    fout = LBM.bounce_back(fout, Ly, 'Inferior')
+    fout = LBM.bounce_back(fout, Ly, 'Superior')
     fout = LBM.outflow_saida(fout)
-#    fout = LBM.bounce_back(f, Ly, 'Superior')
-#    fout = LBM.bounce_back(f, Ly, 'Inferior')
+    rho, u, fout = LBM.zou_he_entrada(u, rho, u_entrada, fout)
     
     fout = LBM.condicao_solido(f, fout, solido, n)
     
     f = LBM.transmissao(f, fout, Lx, Ly)
     
-    if (step % 500 == 0): print('Step -> {}'.format(step))
+    if (step % 100 == 0): print('Step -> {}'.format(step))
     
     if image:
         if (step % 100 == 0):
@@ -90,7 +92,15 @@ for step in range(maxiter):
         if (step % 10 == 0):
             u_mod = modulo_velocidade(u)
             ims = fg.images(u_mod, ims=ims)
-
+            
+    if step > 2:
+        erro_u = abs(u_erro - u)
+        erro_u[:, solido] = 0
+        if (np.all(erro_u < tol)) or (step == maxiter):
+            break
+    u_erro = u
+    step+=1
+    
 print('Animating...')
 if animation:
     fg.save_animation(fig, ims)
