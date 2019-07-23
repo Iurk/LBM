@@ -14,17 +14,11 @@ def grafico(u, step):
     path = 'Simulacao' + '/%s' % file
     plt.clf()
     plt.imshow(u, cmap='RdBu', interpolation='nearest')
+    plt.colorbar(cmap='RdBu')
     plt.savefig(path, dpi=250)
     
-def plot(u):
-    graph = plt.figure()
-    plt.imshow(u, cmap='RdBu', animated=True, interpolation='nearest')
-    plt.colorbar(cmap='RdBu')
-    return graph
-    
 def images(u, ims):
-    im = plot(u)
-    ims.append([im])
+    ims.append([plt.imshow(u, cmap='RdBu', animated=True, interpolation='nearest')])
     return ims
 
 def create_animation():
@@ -33,6 +27,6 @@ def create_animation():
     return fig, ims
 
 def save_animation(fig, ims):
-    writer = animation.writers['ffmpeg'](fps=30)
+    writer = animation.writers['ffmpeg'](fps=60)
     ani = animation.ArtistAnimation(fig, ims)
     ani.save('simulation.mp4', writer=writer, dpi=500)
