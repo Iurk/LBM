@@ -16,7 +16,7 @@ def relaxation_parameter(Re, r, X, Y, c, Uini):
     Ux_max = max(Ux)
     
     ux_est = Ux_max/c
-    ni_est = (ux_est*(2*r))/Re
+    ni_est = (ux_est*(r))/Re
     tau = ni_est/(cs**2) + 1/2
     omega = 1/tau
     return tau, omega
@@ -26,7 +26,7 @@ def perfil_velocidade(y, X, Y, Uini):
     mi = 1
     dP = 1
     
-    U = (((Y-1)**2)/(2*mi))*(-dP/(X))*((y/(Y-1))**2 - (y/(Y-1))) + Uini
+    U = (((Y-1)**2)/(2*mi))*(-dP/(X))*((y/(Y-1))**2 - (y/(Y-1)))*1e-5 + Uini
     return U
 
 # Velocidade na unidade do método e em formato Matricial 3D
@@ -53,8 +53,8 @@ def velocidade_lattice_units(x, y, X, Y, c, Uini, mode='Default'):
     return u
 
 # Identificação das partículas que compõem o cilindro
-def cilindro(x, y, Cx, Cy, r):
-    return (x - Cx)**2 + (y - Cy)**2 < r**2
+def cilindro(Lx, Ly, Cx, Cy, r):
+    return (x - Cx)**2 + (y - Cy)**2 <= r**2
 
 # Rho
 def rho(f):
@@ -65,23 +65,29 @@ def dist_eq(rho, u, e, W, cs, n, X, Y):
     delab = np.array([[1,0],[0,1]])
     
     A = np.zeros((n, X, Y))
+#    A = np.zeros((n, X, Y), dtype=np.longdouble)
     for i in range(n):
         Aaux = 0
+#        Aaux = np.longdouble(0)
         for a in range(2):
             Aaux += u[a]*e[i,a]
         A[i,:,:] = Aaux
     
     B = np.zeros((n, X, Y))
+#    B = np.zeros((n, X, Y), dtype=np.longdouble)
     for i in range(n):
         Baux = 0
+#        Baux = np.longdouble(0)
         for a in range(2):
             sum1 = 0
+#            sum1 = np.longdouble(0)
             for b in range(2):
                 sum1 += u[a]*u[b]*(e[i,a]*e[i,b] - (cs**2)*delab[a,b])
             Baux += sum1
         B[i,:,:] = Baux
         
     feq = np.zeros((n, X, Y))
+#    feq = np.zeros((n, X, Y), dtype=np.longdouble)
     for i in range(n):
         feq[i,:,:] = W[i]*rho*(1 + (1/cs**2)*A[i] + (1/(2*cs**4))*B[i])
     return feq
@@ -91,16 +97,20 @@ def dist_neq(tauab, e, W, cs, n, X, Y):
     delab = np.array([[1,0],[0,1]])
     
     A = np.zeros((n, X, Y))
+#    A = np.zeros((n, X, Y), dtype=np.longdouble)
     for i in range(n):
         Aaux = 0
+#        Aaux = np.longdouble(0)
         for a in range(2):
             sum1 = 0
+#            sum1 = np.longdouble(0)
             for b in range(2):
                 sum1 += tauab[a,b]*(e[i,a]*e[i,b] - (cs**2)*delab[a,b])
             Aaux += sum1
         A[i,:,:] = Aaux
-        
+       
     fneq = np.zeros((n, X, Y))
+#    fneq = np.zeros((n, X, Y), dtype=np.longdouble)
     for i in range(n):
         fneq[i,:,:] = W[i]*(1/(2*cs**4))*A[i]
     return fneq
@@ -108,14 +118,16 @@ def dist_neq(tauab, e, W, cs, n, X, Y):
 # Momentos de Não Equilibrio
 def tauab(fneq, e, X, Y, n):
     tauab = np.zeros((2, 2, X, Y))
+#    tauab = np.zeros((2, 2, X, Y), dtype=np.longdouble)
     for a in range(2):
         for b in range(2):
             for i in range(n):
                 tauab[a,b,:,:] += fneq[i]*e[i,a]*e[i,b]
     return tauab
     
-def collision_step(feq, fneq, omega):
+def collision_step(feq, fneq, omega):#feq, fneq, omega
     fout = feq +(1 - omega)*fneq
+#    fout = f - (f - feq)*omega
     return fout
 
 def transmissao(f, fout, X, Y):

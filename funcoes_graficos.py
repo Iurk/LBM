@@ -5,6 +5,7 @@ Created on Tue Jul  2 13:31:44 2019
 
 @author: iurk
 """
+from matplotlib import cm
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
@@ -13,8 +14,8 @@ def grafico(u, step):
     file = 'vel.' + str(step) + '.png'
     path = 'Simulacao' + '/%s' % file
     plt.clf()
-    plt.imshow(u, cmap='RdBu', interpolation='nearest')
-    plt.colorbar(cmap='RdBu')
+    plt.imshow(u, cmap=cm.RdBu, interpolation='nearest')
+    plt.colorbar(cmap=cm.RdBu)
     plt.savefig(path, dpi=250)
     
 def images(u, ims):
