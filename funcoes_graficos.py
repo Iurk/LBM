@@ -5,28 +5,32 @@ Created on Tue Jul  2 13:31:44 2019
 
 @author: iurk
 """
+#from images2gif import writeGif
+from matplotlib import cm
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from PIL import Image
+import imageio
 
-def grafico(u, step):
-    
+
+def grafico(u, step, pasta_imagens):
     file = 'vel.' + str(step) + '.png'
-    path = 'Simulacao' + '/%s' % file
+    path = pasta_imagens + '/%s' % file
     plt.clf()
-    plt.imshow(u, cmap='RdBu', interpolation='nearest')
-    plt.colorbar(cmap='RdBu')
+    plt.imshow(u, cmap=cm.RdBu, interpolation='nearest')
+    plt.colorbar(cmap=cm.RdBu)
     plt.savefig(path, dpi=250)
     
-def images(u, ims):
-    ims.append([plt.imshow(u, cmap='RdBu', animated=True, interpolation='nearest')])
-    return ims
-
-def create_animation():
-    fig = plt.figure()
-    ims = []
-    return fig, ims
-
-def save_animation(fig, ims):
-    writer = animation.writers['ffmpeg'](fps=60)
-    ani = animation.ArtistAnimation(fig, ims)
-    ani.save('simulation.mp4', writer=writer, dpi=500)
+def animation(pasta, pasta_imagens):
+    from os import listdir
+    
+    file = 'simulation.gif'
+    path = pasta + '/%s' % file
+    
+    files_imgs = [im for im in listdir(pasta_imagens) if im.endswith('.png')]
+    files_imgs.sort(key=__ordenar)
+    
+    images = [imageio.imread(pasta_imagens + '/%s' % file) for file in files_imgs]
+    imageio.mimsave(path, images)
+    
+def __ordenar(item):
+    return int(item.split('.')[1])
