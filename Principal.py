@@ -29,13 +29,8 @@ Reynolds = [220]    # Reynolds Numbers
 escoamento = 'Turbulento'
 Uini = 1
 
-maxiter = 1000    # Número de Iterações
+maxiter = 10000    # Número de Iterações
 tol = 1e-5
-
-#***** Data Visualization *****
-animation = True
-image = True
-text = True
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
@@ -50,7 +45,7 @@ W = np.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
 
 #***** Construção do Cilindro e Perfil de Velocidades *****
 solido = LBM.cilindro(Nx, Ny, Cx, Cy, r)
-u_entrada = LBM.velocidade_lattice_units(L, H, Nx, Ny, c, Uini, 'Perfil', escoamento)
+u_entrada = LBM.velocidade_lattice_units(L, H, Nx, Ny, c, Uini, 'Constante', escoamento)
 u_erro = np.ones((2, Nx, Ny))
 
 for Re in Reynolds:
@@ -61,8 +56,6 @@ for Re in Reynolds:
     print('Initializing')
     feq = LBM.dist_eq(Nx, Ny, u_entrada, e, cs, n, 1.0, W)
     f = feq.copy()
-    
-    fig, ims = fg.create_animation()
     
     print('Running...')
     step = 0
@@ -105,11 +98,10 @@ for Re in Reynolds:
     delta_t = fim - ini
     print('Simulation Time: {0:.2f} s'.format(delta_t))
     
-    if animation:
-        print('Animating...')
-        fg.animation(fig, ims, folder, folder_imagens)
+    print('Animating...')
+    fg.animation(folder, folder_imagens)
     
-    if text:
-        print('Saving Data...')
-        fd.save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, folder)
+    print('Saving Data...')
+    fd.save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, folder)
     print('All Done!')
+    
