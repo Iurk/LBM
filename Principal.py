@@ -24,12 +24,15 @@ Ny = 180    # Número de partículas em y [Lattice units]
 Cx = Nx/4   # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2   # Centro do Cilindro em y [Lattice units]
 r = Ny/9    # Raio do Cilindro [Lattice units]
+D = 2*r
 
-Reynolds = [220]    # Reynolds Numbers
+Reynolds = [5, 50, 100, 200]    # Reynolds Numbers
+cl_s = []
+cd_s = []
 escoamento = 'Turbulento'
 Uini = 1
 
-maxiter = 10000    # Número de Iterações
+maxiter = 1000    # Número de Iterações
 tol = 1e-5
 
 #***** D2Q9 Parameters *****
@@ -44,17 +47,19 @@ e = np.stack((ex, ey), axis=1)
 W = np.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
 
 #***** Construção do Cilindro e Perfil de Velocidades *****
-solido = LBM.cilindro(Nx, Ny, Cx, Cy, r)
-u_entrada = LBM.velocidade_lattice_units(L, H, Nx, Ny, c, Uini, 'Constante', escoamento)
+solid = LBM.cilindro(Nx, Ny, Cx, Cy, r)
+wall_cilindro = LBM.parede_cilindro(Nx, Ny, solid, e, n)
+u_inlet = LBM.velocidade_lattice_units(L, H, Nx, Ny, c, Uini, 'Constante', escoamento)
 u_erro = np.ones((2, Nx, Ny))
 
 for Re in Reynolds:
+    print('\nRe = {}'.format(Re))
     folder, folder_imagens = fd.criar_pasta(Re)
     tau, omega = LBM.relaxation_parameter(L, H, Nx, Ny, r, c, cs, Uini, Re, escoamento)
     
 #***** Inicialização *****
     print('Initializing')
-    feq = LBM.dist_eq(Nx, Ny, u_entrada, e, cs, n, 1.0, W)
+    feq = LBM.dist_eq(Nx, Ny, u_inlet, e, cs, n, 1.0, W)
     f = feq.copy()
     
     print('Running...')
@@ -73,9 +78,9 @@ for Re in Reynolds:
         fout = LBM.bounce_back(fout, 'Inferior')
         fout = LBM.bounce_back(fout, 'Superior')
         fout = LBM.outflow_saida(fout)
-        rho, u, fout = LBM.zou_he_entrada(u, rho, u_entrada, fout)
+        rho, u, fout = LBM.zou_he_entrada(u, rho, u_inlet, fout)
         
-        fout = LBM.condicao_solido(solido, n, f, fout)
+        fout = LBM.condicao_solido(solid, n, f, fout)
         
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
@@ -87,13 +92,18 @@ for Re in Reynolds:
             fg.grafico(u_mod, step, folder_imagens)
                 
         erro_u = abs(u_erro - u)
-        erro_u[:, solido] = 0
+        erro_u[:, solid] = 0
         if (np.all(erro_u < tol)) or (step == maxiter):
             break
         
         u_erro = u
         step+=1
         
+    Forca = LBM.forca(Nx, Ny, wall_cilindro, e, n, fout, f)
+    cd, cl = LBM.coeficientes(Nx, Ny, D, wall_cilindro, u_inlet, rho, Forca)
+    
+    cd_s.append(cd); cl_s.append(cl)
+    
     fim = time()
     delta_t = fim - ini
     print('Simulation Time: {0:.2f} s'.format(delta_t))
@@ -103,5 +113,8 @@ for Re in Reynolds:
     
     print('Saving Data...')
     fd.save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, folder)
-    print('All Done!')
+
+print('Saving Coefficients...')
+fd.save_coeficientes(Reynolds, cl_s, cd_s)
+print('All Done!')
     
