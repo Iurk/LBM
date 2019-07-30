@@ -32,7 +32,7 @@ cd_s = []
 escoamento = 'Turbulento'
 Uini = 1
 
-maxiter = 1000    # Número de Iterações
+maxiter = 10000    # Número de Iterações
 tol = 1e-5
 
 #***** D2Q9 Parameters *****
