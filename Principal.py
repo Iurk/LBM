@@ -95,7 +95,6 @@ for Re in Reynolds:
         erro_u[:, solid] = 0
         if (np.all(erro_u < tol)) or (step == maxiter):
             break
-        
         u_erro = u
         step+=1
         
