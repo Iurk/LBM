@@ -44,9 +44,9 @@ def velocidade_lattice_units(L, H, Nx, Ny, c, Uini, mode, escoamento):
         U[0,:] = __perfil_velocidade(L, H, Ny, Uini, U[0], escoamento)
         
     elif mode == 'Constante':
-        for i in range(Nx):
-            for j in range(Ny):
-                U[0,i,j] = Uini
+        for xi in range(Nx):
+            for yi in range(Ny):
+                U[0,xi,yi] = Uini
     u = U/c
     return u
 
@@ -54,11 +54,24 @@ def velocidade_lattice_units(L, H, Nx, Ny, c, Uini, mode, escoamento):
 def cilindro(Nx, Ny, Cx, Cy, r):
     solido = np.zeros((Nx, Ny), dtype=bool)
     
-    for x in range(Nx):
-        for y in range(Ny):
-            if (x - Cx)**2 + (y - Cy)**2 < r**2:
-                solido[x, y] = True
+    for xi in range(Nx):
+        for yi in range(Ny):
+            if (xi - Cx)**2 + (yi - Cy)**2 < r**2:
+                solido[xi, yi] = True
     return solido
+
+def parede_cilindro(Nx, Ny, solido, e, n):
+    parede = np.zeros((Nx, Ny), dtype=bool)
+    
+    for xi in range(Nx-1):
+        for yi in range(Ny-1):
+            for i in range(n):
+                x_next = xi + e[i,0]
+                y_next = yi + e[i,1]
+                if solido[x_next, y_next]:
+                    parede[xi, yi] = True
+    parede[solido] = False
+    return parede
 
 # Rho
 def rho(f):
@@ -129,10 +142,12 @@ def tauab(Nx, Ny, e, n, fneq):
                 tauab[a,b,:,:] += fneq[i]*e[i,a]*e[i,b]
     return tauab
     
+# Etapa de Colisão
 def collision_step(feq, fneq, omega):
     fout = feq +(1 - omega)*fneq
     return fout
 
+# Transmissão
 def transmissao(Nx, Ny, f, fout):
     f[0,:,:] = fout[0,:,:]
     f[1,1:Nx,:] = fout[1,0:Nx-1,:]
@@ -145,6 +160,7 @@ def transmissao(Nx, Ny, f, fout):
     f[8,1:Nx,1:Ny] = fout[8,0:Nx-1,0:Ny-1]
     return f   
 
+# Condições de Contorno
 def zou_he_entrada(u, rho, u_entrada, f):
     u[:,0,:] = u_entrada[:,0,:]
     rho[0,:] = (f[0,0,:] + f[2,0,:] + f[4,0,:] + 2*(f[3,0,:] + f[6,0,:] + f[7,0,:]))/(1 - u[0,0,:])
@@ -177,3 +193,25 @@ def condicao_solido(solido, n, f, fout):
         fout[i, solido] = f[noslip[i], solido]
     return fout
     
+# Cálculo de Força
+def forca(Nx, Ny, parede, e, n, f_before, f_after):
+    F = np.zeros((2, Nx, Ny))
+    
+    for i in range(n):
+        F[0, parede] += (f_after[i, parede] + f_before[i, parede])*e[i, 0]
+        F[1, parede] += (f_after[i, parede] + f_before[i, parede])*e[i, 1]
+    return F
+
+# Cálculo dos Coeficientes
+def coeficientes(Nx, Ny, D, parede, u, rho, F):
+    cd = np.zeros((Nx, Ny))
+    cl = cd.copy()
+    
+    pressao_dinamica = (1/2)*rho*(u[0]**2)
+    
+    cd = F[0]/(pressao_dinamica*D)
+    cl = F[1]/(pressao_dinamica*D)
+    
+    cd_avg = np.mean(cd[parede])
+    cl_avg = np.mean(cl[parede])
+    return cd_avg, cl_avg
