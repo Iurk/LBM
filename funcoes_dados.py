@@ -35,6 +35,22 @@ def save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, pasta):
     array(dados)
     savetxt(path, dados, fmt='%s')
     
+def save_coeficientes(Re, cl, cd):
+    from numpy import array, savetxt
+    
+    file = 'Coeficientes.txt'
+    
+    s = []
+    title = 'Re \t  cl \t  cd'
+    
+    s.append(title)
+    for i in range(len(Re)):
+        saux = '{:d} \t {:.3f} \t {:.3f}'.format(Re[i], cl[i], cd[i])
+        s.append(saux)
+        
+    array(s)
+    savetxt(file, s, fmt='%s')    
+    
 def __create_text(dominio, cilindro, lattice, simulation, **kwargs):
     values = list(kwargs.values())
     s = []
