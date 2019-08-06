@@ -9,16 +9,24 @@ import numpy as np
 # Arquivo de funções
 
 # Termo de Relaxação
-def relaxation_parameter(L, H, Nx, Ny, r, c, cs, Uini, Re, escoamento):
-    Ux = np.zeros((Nx, Ny))
-    Ux = __perfil_velocidade(L, H, Ny, Uini, Ux, escoamento)
-    Ux_max = max(Ux[0,:])
-    
-    ux_est = Ux_max/c
-    ni_est = (ux_est*(r))/Re
-    tau = ni_est/(cs**2) + 1/2
-    omega = 1/tau
-    return tau, omega
+def relaxation_parameter(L, H, Nx, Ny, r, c, cs, Uini, Re, mode, escoamento=None):
+    while True:
+        if mode == 'Constante':
+            u_est = Uini/c
+            ni_est = (u_est*(2*r))/Re
+        elif mode == 'Perfil':
+            U = np.zeros((2, Nx, Ny))
+            U[0,:] = __perfil_velocidade(L, H, Ny, Uini, U[0], escoamento)
+            u_est = U/c
+            umax_est = max(u_est)
+            ni_est = (umax_est*(2*r))/Re
+            
+        tau = ni_est/(cs**2) + 1/2
+        omega = 1/tau
+        
+        if 0.5 <= tau <= 1.05*0.5:
+            return c, tau, omega
+        c *= 10
 
 # Perfis de Velocidade
 def __perfil_velocidade(L, H, Ny, Uini, Uvar, escoamento):
@@ -37,7 +45,7 @@ def __perfil_velocidade(L, H, Ny, Uini, Uvar, escoamento):
     return Uvar
 
 # Velocidade na unidade do método e em formato Matricial 3D
-def velocidade_lattice_units(L, H, Nx, Ny, c, Uini, mode, escoamento):
+def velocidade_lattice_units(L, H, Nx, Ny, c, Uini, mode, escoamento=None):
     U = np.zeros((2, Nx, Ny))
 
     if mode == 'Perfil':
@@ -56,22 +64,9 @@ def cilindro(Nx, Ny, Cx, Cy, r):
     
     for xi in range(Nx):
         for yi in range(Ny):
-            if (xi - Cx)**2 + (yi - Cy)**2 < r**2:
+            if (xi - Cx)**2 + (yi - Cy)**2 <= r**2:
                 solido[xi, yi] = True
     return solido
-
-def parede_cilindro(Nx, Ny, solido, e, n):
-    parede = np.zeros((Nx, Ny), dtype=bool)
-    
-    for xi in range(Nx-1):
-        for yi in range(Ny-1):
-            for i in range(n):
-                x_next = xi + e[i,0]
-                y_next = yi + e[i,1]
-                if solido[x_next, y_next]:
-                    parede[xi, yi] = True
-    parede[solido] = False
-    return parede
 
 # Rho
 def rho(f):
@@ -187,31 +182,68 @@ def bounce_back(f, parede):
         f[6,:,0] = f[8,:,0]
     return f
 
+def condicao_wall(Nx, Ny, solido, e, n, fout):
+    noslip = [0, 3, 4, 1, 2, 7, 8, 5, 6]
+    
+    for xi in range(Nx-1):
+        for yi in range(Ny-1):
+            for i in range(n):
+                x_next = xi + e[i, 0]
+                y_next = yi + e[i, 1]
+                
+                if solido[x_next, y_next]:
+                    fout[i, xi, yi] = fout[noslip[i], xi, yi]
+    return fout
+    
 def condicao_solido(solido, n, f, fout):
     noslip = [0, 3, 4, 1, 2, 7, 8, 5, 6]
     for i in range(n):
         fout[i, solido] = f[noslip[i], solido]
     return fout
+
+def parede_cilindro(Nx, Ny, solido, e, n):
+    fluid = np.zeros((Nx, Ny), dtype=bool)
+    solido_l1 = np.zeros((Nx, Ny), dtype=bool)
+    
+    for xi in range(Nx-1):
+        for yi in range(Ny-1):
+            if solido[xi, yi]:
+                for i in range(n):
+                    x_next = xi + e[i, 0]
+                    y_next = yi + e[i, 1]
+                    if not solido[x_next, y_next]:
+                        fluid[x_next, y_next] = True
+                        solido_l1[xi, yi] = True
+    return fluid, solido_l1
     
 # Cálculo de Força
-def forca(Nx, Ny, parede, e, n, f_before, f_after):
-    F = np.zeros((2, Nx, Ny))
-    
-    for i in range(n):
-        F[0, parede] += (f_after[i, parede] + f_before[i, parede])*e[i, 0]
-        F[1, parede] += (f_after[i, parede] + f_before[i, parede])*e[i, 1]
-    return F
+def forca(Nx, Ny, solido, e, c, n, f):
+    noslip = [0, 3, 4, 1, 2, 7, 8, 5, 6]
+    Force = np.zeros((2))
+
+    for xi in range(Nx-1):
+        for yi in range(Ny-1):
+            if solido[xi, yi]:
+                Momentum = np.zeros((2))
+                for i in range(1, n):
+                    x_next = xi + e[i, 0]
+                    y_next = yi + e[i, 1]
+                        
+                    if not solido[x_next, y_next]:
+                        for a in range(2):
+                            Momentum[a] += (f[i, xi, yi] - f[noslip[i], x_next, y_next])*e[i, a]*c
+    #                       Momentum[a] += (e[i, a]*f[i, x_next, y_next] - (-1)*e[i, a]*f[i, xi, yi])*c #FUNCIONA
+                Force += Momentum
+    return Force
 
 # Cálculo dos Coeficientes
-def coeficientes(Nx, Ny, D, parede, u, rho, F):
-    cd = np.zeros((Nx, Ny))
-    cl = cd.copy()
+def coeficientes(Nx, Ny, D, U, rho, Force):
     
-    pressao_dinamica = (1/2)*rho*(u[0]**2)
+    pressao_dinamica = (1/2)*rho*(U**2)
     
-    cd = F[0]/(pressao_dinamica*D)
-    cl = F[1]/(pressao_dinamica*D)
+    cd = Force[0]/(pressao_dinamica*D)
+    cl = Force[1]/(pressao_dinamica*D)
     
-    cd_avg = np.mean(cd[parede])
-    cl_avg = np.mean(cl[parede])
-    return cd_avg, cl_avg
+#    cd_avg = np.mean(cd[parede])
+#    cl_avg = np.mean(cl[parede])
+    return cl, cd
