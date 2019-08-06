@@ -217,24 +217,39 @@ def parede_cilindro(Nx, Ny, solido, e, n):
     return fluid, solido_l1
     
 # Cálculo de Força
-def forca(Nx, Ny, solido, e, c, n, f):
+def forca(Nx, Ny, solido, u, e, c, n, rho, W, tau, f):
+    delta = 0.5
     noslip = [0, 3, 4, 1, 2, 7, 8, 5, 6]
     Force = np.zeros((2))
-
-    for xi in range(Nx-1):
-        for yi in range(Ny-1):
+    
+    for xi in range(Nx - 1):
+        for yi in range(Ny - 1):
             if solido[xi, yi]:
                 Momentum = np.zeros((2))
-                for i in range(1, n):
+                for i in range(n):
                     x_next = xi + e[i, 0]
                     y_next = yi + e[i, 1]
-                        
+                    
                     if not solido[x_next, y_next]:
+                        chi = (2*delta - 1)/(tau - 1)
+                        ubf = u[:, x_next, y_next]
+                        uf = u[:, x_next, y_next]
+                        
+                        fi_est = __dist_equilibrio_fic(uf, ubf, e[i], rho[x_next, y_next], W[i])
+                        fi_barra = (1 - chi)*f[i, x_next, y_next] + chi*fi_est
+                        
                         for a in range(2):
-                            Momentum[a] += (f[i, xi, yi] - f[noslip[i], x_next, y_next])*e[i, a]*c
-    #                       Momentum[a] += (e[i, a]*f[i, x_next, y_next] - (-1)*e[i, a]*f[i, xi, yi])*c #FUNCIONA
+                            Momentum[a] += (fi_barra + f[i, x_next, y_next])*e[i, a]*c
                 Force += Momentum
     return Force
+
+def __dist_equilibrio_fic(uf, ubf, e, rho, W):
+    A = np.dot(e, ubf)
+    B = np.dot(e, uf)
+    C = np.dot(uf, uf)
+        
+    feq_fic = W*rho*(1 + 3*A + (9/2)*(B**2) - (3/2)*C)
+    return feq_fic
 
 # Cálculo dos Coeficientes
 def coeficientes(Nx, Ny, D, U, rho, Force):
