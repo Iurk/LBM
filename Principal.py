@@ -26,13 +26,13 @@ Cy = Ny/2   # Centro do Cilindro em y [Lattice units]
 r = Ny/9    # Raio do Cilindro [Lattice units]
 D = 2*r
 
-Reynolds = [50]    # Reynolds Numbers
+Reynolds = [10]    # Reynolds Numbers
 cl_s = []
 cd_s = []
 cl_step = []
 cd_step = []
 
-Uini = 1.0
+Uini = 0.23
 mode = 'Constante'
 #escoamento = 'Laminar'
 
@@ -89,7 +89,7 @@ for Re in Reynolds:
 
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
-
+        
         Forca = LBM.forca(Nx, Ny, solid, u, e, c, n, rho, W, tau, f)
         cl, cd = LBM.coeficientes(Nx, Ny, D, Uini, 1.0, Forca)
         cl_step.append(cl); cd_step.append(cd)
