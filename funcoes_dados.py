@@ -6,6 +6,7 @@ Created on Wed Jul 24 13:09:59 2019
 @author: iurk
 """
 def criar_pasta(Re):
+    from shutil import rmtree
     from os import listdir, mkdir
     from os.path import isdir, join
     
@@ -19,6 +20,8 @@ def criar_pasta(Re):
         mkdir(pasta_imagens)
     else:
         pasta_imagens = pasta + '/%s' % 'Simulacao'
+        rmtree(pasta_imagens)
+        mkdir(pasta_imagens)
     return pasta, pasta_imagens
 
 def save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, pasta):
@@ -34,6 +37,23 @@ def save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, pasta):
                         var4='Cx', var5='Cy', var6='c', var7='tau', var8='Iterações', var9='Tempo Total')
     array(dados)
     savetxt(path, dados, fmt='%s')
+    
+def save_coeficientes_step(steps, pasta, cl, cd):
+    from numpy import array, savetxt
+    
+    file = 'Coeficientes_step.txt'
+    path = pasta + '/%s' % file
+    
+    s = []
+    title = 'Step \t cl \t cd'
+    
+    s.append(title)
+    for i in range(steps):
+        saux = '{:d} \t {:.3f} \t {:.3f}'.format(i, cl[i], cd[i])
+        s.append(saux)
+    
+    array(s)
+    savetxt(path, s, fmt='%s')
     
 def save_coeficientes(Re, cl, cd):
     from numpy import array, savetxt
