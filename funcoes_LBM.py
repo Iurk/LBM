@@ -226,13 +226,13 @@ def forca(Nx, Ny, solido, u, e, c, n, rho, W, tau, f):
         for yi in range(Ny - 1):
             if solido[xi, yi]:
                 Momentum = np.zeros((2))
+                ubf = __ubf_definition(xi, yi, solido, u, e, n)
                 for i in range(n):
                     x_next = xi + e[i, 0]
                     y_next = yi + e[i, 1]
                     
                     if not solido[x_next, y_next]:
                         chi = (2*delta - 1)/(tau - 1)
-                        ubf = u[:, x_next, y_next]
                         uf = u[:, x_next, y_next]
                         
                         fi_est = __dist_equilibrio_fic(uf, ubf, e[i], rho[x_next, y_next], W[i])
@@ -242,6 +242,30 @@ def forca(Nx, Ny, solido, u, e, c, n, rho, W, tau, f):
                             Momentum[a] += (fi_barra + f[i, x_next, y_next])*e[i, a]*c
                 Force += Momentum
     return Force
+
+def __ubf_definition(xi, yi, solido, u, e, n):
+    ubf = np.zeros((2))
+    
+    for i in range(n):
+        x_next = xi + e[i, 0]
+        y_next = yi + e[i, 1]
+        
+        if (e[i, 0] < 0) and not solido[x_next, y_next]:
+            ubf = u[:, x_next-1, y_next+1]
+            break
+        elif (e[i, 0] > 0) and not solido[x_next, y_next]:
+            ubf = u[:, x_next, y_next+1]
+            break
+        elif (e[i,1] < 0) and not solido[x_next, y_next]:
+            ubf = u[:, x_next, y_next-1]
+            break
+        elif (e[i, 1] > 0) and not solido[x_next, y_next]:
+            ubf = u[:, x_next, y_next+1]
+            break
+    return ubf
+            
+            
+    
 
 def __dist_equilibrio_fic(uf, ubf, e, rho, W):
     A = np.dot(e, ubf)
