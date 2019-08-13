@@ -18,26 +18,29 @@ def modulo_velocidade(u):
 #***** Entrada de Dados *****
 L = 1       # Comprimento do túnel [m]
 H = 2.5     # Altura do túnel [m]
-Nx = 520    # Número de partículas em x [Lattice units]
-Ny = 180    # Número de partículas em y [Lattice units]
+Nx = 600    # Número de partículas em x [Lattice units]
+Ny = 300    # Número de partículas em y [Lattice units]
 
-Cx = Nx/4   # Centro do Cilindro em x [Lattice units]
-Cy = Ny/2   # Centro do Cilindro em y [Lattice units]
-r = Ny/9    # Raio do Cilindro [Lattice units]
-D = 2*r
+Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
+Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
+D_est = Ny/10    # Diâmetro do Cilindro [Lattice units]
+D = 1
 
 Reynolds = [10]    # Reynolds Numbers
-cl_s = []
-cd_s = []
+cl_Re = []
+cd_Re = []
 cl_step = []
 cd_step = []
 
-Uini = 0.23
+# Propriedades do Ar
+rho_ar = 1.0 #1.21
+mi_ar = 1.81e-5
+
+Uini = 0.5
 mode = 'Constante'
 #escoamento = 'Laminar'
 
-maxiter = 3000      # Número de Iterações
-tol = 1e-5          # Tolerância para Convergência
+maxiter = 10000      # Número de Iterações
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
@@ -51,16 +54,16 @@ e = np.stack((ex, ey), axis=1)
 W = np.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
 
 #***** Construção do Cilindro e Perfil de Velocidades *****
-solid = LBM.cilindro(Nx, Ny, Cx, Cy, r)
-wall = LBM.parede_cilindro(Nx, Ny, solid, e, n)
+solido = LBM.cilindro(Nx, Ny, Cx, Cy, D_est)
+#wall = LBM.parede_cilindro(Nx, Ny, solid, e, n)
 
 for Re in Reynolds:
     print('\nRe = {}'.format(Re))
     folder, folder_imagens = fd.criar_pasta(Re)
-    c, tau, omega = LBM.relaxation_parameter(L, H, Nx, Ny, r, c, cs, Uini, Re, mode)
+    c, tau, omega = LBM.relaxation_parameter(L, H, Nx, Ny, D_est, c, cs, Uini, Re, mode)
+#    c, tau, omega = LBM.relaxation_parameter(dx, dt, D, cs, Uini, Re, rho_ar)
     
     u_inlet = LBM.velocidade_lattice_units(L, H, Nx, Ny, c, Uini, mode)
-    u_erro = np.ones((2, Nx, Ny))
     
 #***** Inicialização *****
     print('Initializing')
@@ -82,16 +85,20 @@ for Re in Reynolds:
 #***** Condições de Contorno *****
         fout = LBM.bounce_back(fout, 'Inferior')
         fout = LBM.bounce_back(fout, 'Superior')
-        fout = LBM.outflow_saida(fout)
+#        fout = LBM.outflow(fout)
+        fout = LBM.extrapolacao_saida(fout)
         rho, u, fout = LBM.zou_he_entrada(u, rho, u_inlet, fout)
         
-        fout = LBM.condicao_solido(solid, n, f, fout)
+#        fout = LBM.condicao_solido(solid, n, f, fout)
+        fout = LBM.condicao_wall(Nx, Ny, solido, e, n, fout)
+        
 
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
         
-        Forca = LBM.forca(Nx, Ny, solid, u, e, c, n, rho, W, tau, f)
-        cl, cd = LBM.coeficientes(Nx, Ny, D, Uini, 1.0, Forca)
+#        Forca = LBM.forca(Nx, Ny, solido, u, e, c, n, rho, W, tau, f)
+        Forca = LBM.forca_2(Nx, Ny, solido, e, c, n, f)
+        cl, cd = LBM.coeficientes(Nx, Ny, D, Uini, rho_ar, Forca)
         cl_step.append(cl); cd_step.append(cd)
         
         if (step % 500 == 0): print('Step -> {}'.format(step))
@@ -99,24 +106,12 @@ for Re in Reynolds:
         if (step % 100 == 0):
             u_mod = modulo_velocidade(u)
             fg.grafico(u_mod, step, folder_imagens)
-                
-#        erro_u = abs(u_erro - u)
-#        erro_u[:, solid] = 0
-#        if (np.all(erro_u < tol)) or (step == maxiter):
-#            break
         
         if (step == maxiter):
             break
-        u_erro = u
         step+=1
     
     fd.save_coeficientes_step(step, folder, cl_step, cd_step)
-    
-#    Forca = LBM.forca(Nx, Ny, wall, e, n, fout, f)
-#    Forca2 = LBM.forca_2(Nx, Ny, wall, solid, )
-#    cd, cl = LBM.coeficientes(Nx, Ny, D, wall, u_inlet, rho, Forca)
-#    
-#    cd_s.append(cd); cl_s.append(cl)
     
     fim = time()
     delta_t = fim - ini
@@ -125,8 +120,8 @@ for Re in Reynolds:
     print('Animating...')
     fg.animation(folder, folder_imagens)
     
-    print('Saving Data...')
-    fd.save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, folder)
+#    print('Saving Data...')
+#    fd.save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, folder)
 
 print('Saving Coefficients...')
 #fd.save_coeficientes(Reynolds, cl_s, cd_s)
