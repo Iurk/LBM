@@ -18,15 +18,15 @@ def modulo_velocidade(u):
 #***** Entrada de Dados *****
 L = 1       # Comprimento do túnel [m]
 H = 2.5     # Altura do túnel [m]
-Nx = 600    # Número de partículas em x [Lattice units]
-Ny = 300    # Número de partículas em y [Lattice units]
+Nx = 1000    # Número de partículas em x [Lattice units]
+Ny = 400    # Número de partículas em y [Lattice units]
 
 Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = Ny/10    # Diâmetro do Cilindro [Lattice units]
+D_est = 80    # Diâmetro do Cilindro [Lattice units]
 D = 1
 
-Reynolds = [10]    # Reynolds Numbers
+Reynolds = [50]    # Reynolds Numbers
 cl_Re = []
 cd_Re = []
 cl_step = []
@@ -36,11 +36,11 @@ cd_step = []
 rho_ar = 1.0 #1.21
 mi_ar = 1.81e-5
 
-Uini = 0.5
+Uini = 1
 mode = 'Constante'
 #escoamento = 'Laminar'
 
-maxiter = 10000      # Número de Iterações
+maxiter = 70000      # Número de Iterações
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
@@ -55,15 +55,15 @@ W = np.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
 
 #***** Construção do Cilindro e Perfil de Velocidades *****
 solido = LBM.cilindro(Nx, Ny, Cx, Cy, D_est)
-#wall = LBM.parede_cilindro(Nx, Ny, solid, e, n)
 
 for Re in Reynolds:
     print('\nRe = {}'.format(Re))
     folder, folder_imagens = fd.criar_pasta(Re)
     c, tau, omega = LBM.relaxation_parameter(L, H, Nx, Ny, D_est, c, cs, Uini, Re, mode)
-#    c, tau, omega = LBM.relaxation_parameter(dx, dt, D, cs, Uini, Re, rho_ar)
+#    tau, omega = LBM.relaxation_parameter(D, c, cs, Uini, Re, rho_ar)
     
     u_inlet = LBM.velocidade_lattice_units(L, H, Nx, Ny, c, Uini, mode)
+    uini = Uini/c
     
 #***** Inicialização *****
     print('Initializing')
@@ -82,24 +82,20 @@ for Re in Reynolds:
         fneq = LBM.dist_neq(Nx, Ny, e, cs, n, W, tauab)
         fout = LBM.collision_step(feq, fneq, omega)
         
-#***** Condições de Contorno *****
-        fout = LBM.bounce_back(fout, 'Inferior')
-        fout = LBM.bounce_back(fout, 'Superior')
-#        fout = LBM.outflow(fout)
-        fout = LBM.extrapolacao_saida(fout)
-        rho, u, fout = LBM.zou_he_entrada(u, rho, u_inlet, fout)
-        
-#        fout = LBM.condicao_solido(solid, n, f, fout)
-        fout = LBM.condicao_wall(Nx, Ny, solido, e, n, fout)
-        
+        fout = LBM.condicao_solido(solido, n, f, fout)
 
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
+#        f = LBM.condicao_wall(Nx, Ny, solido, e, n, f, fout)
         
-#        Forca = LBM.forca(Nx, Ny, solido, u, e, c, n, rho, W, tau, f)
-        Forca = LBM.forca_2(Nx, Ny, solido, e, c, n, f)
-        cl, cd = LBM.coeficientes(Nx, Ny, D, Uini, rho_ar, Forca)
+        Forca = LBM.forca(Nx, Ny, solido, e, c, n, f)
+        cl, cd = LBM.coeficientes(Nx, Ny, D_est, uini, rho_ar, Forca)
         cl_step.append(cl); cd_step.append(cd)
+        
+#***** Condições de Contorno *****
+        f = LBM.condicao_periodica_paredes(Nx, fout, f)
+        rho, u, f = LBM.zou_he_entrada(u, rho, u_inlet, f)
+        rho, u, f = LBM.zou_he_saida(u, rho, f)
         
         if (step % 500 == 0): print('Step -> {}'.format(step))
         
