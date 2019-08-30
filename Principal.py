@@ -10,34 +10,41 @@ from time import time
 import funcoes_LBM as LBM
 import funcoes_dados as fd
 import funcoes_graficos as fg
-ini = time()
+
 
 def modulo_velocidade(u):
     return np.linalg.norm(u, axis=0).transpose()
 
+def pressao(rho, cs):
+    pressao = rho*cs**2
+    return pressao.transpose()
+
 #***** Entrada de Dados *****
 L = 1       # Comprimento do túnel [m]
 H = 2.5     # Altura do túnel [m]
-Nx = 520    # Número de partículas em x [Lattice units]
-Ny = 180    # Número de partículas em y [Lattice units]
+Nx = 1500    # Número de partículas em x [Lattice units]
+Ny = 600    # Número de partículas em y [Lattice units]
 
-Cx = Nx/4   # Centro do Cilindro em x [Lattice units]
-Cy = Ny/2   # Centro do Cilindro em y [Lattice units]
-r = Ny/9    # Raio do Cilindro [Lattice units]
-D = 2*r
+Cx = 400       # Centro do Cilindro em x [Lattice units]
+Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
+D_est = 40    # Diâmetro do Cilindro [Lattice units]
 
-Reynolds = [5, 50, 100, 200]    # Reynolds Numbers
-cl_s = []
-cd_s = []
-escoamento = 'Turbulento'
-Uini = 1
+Reynolds = [500]    # Reynolds Numbers
+cl_Re = []
+cd_Re = []
 
-maxiter = 10000    # Número de Iterações
-tol = 1e-5
+# Propriedades do Ar
+rho_ar = 1.0 #1.21
+mi_ar = 1.81e-5
+
+uini = 0.05
+mode = 'Constante'
+#escoamento = 'Turbulento'
+
+maxiter = 10000      # Número de Iterações
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
-c = 25                      # Lattice speed
 cs = 1/np.sqrt(3)           # Velocidade do Som em unidades Lattice
 
 #***** Lattice Constants *****
@@ -47,15 +54,18 @@ e = np.stack((ex, ey), axis=1)
 W = np.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
 
 #***** Construção do Cilindro e Perfil de Velocidades *****
-solid = LBM.cilindro(Nx, Ny, Cx, Cy, r)
-wall_cilindro = LBM.parede_cilindro(Nx, Ny, solid, e, n)
-u_inlet = LBM.velocidade_lattice_units(L, H, Nx, Ny, c, Uini, 'Constante', escoamento)
-u_erro = np.ones((2, Nx, Ny))
+solido = LBM.cilindro(Nx, Ny, Cx, Cy, D_est)
 
 for Re in Reynolds:
+    ini = time()
+    cl_step = []
+    cd_step = []
+    
     print('\nRe = {}'.format(Re))
-    folder, folder_imagens = fd.criar_pasta(Re)
-    tau, omega = LBM.relaxation_parameter(L, H, Nx, Ny, r, c, cs, Uini, Re, escoamento)
+    folder, folder_vel, folder_pres = fd.criar_pasta(Re)
+    tau, omega = LBM.relaxation_parameter(L, H, Nx, Ny, D_est, cs, uini, Re, mode)
+    
+    u_inlet = LBM.velocidade_lattice_units(Nx, Ny, uini, mode)
     
 #***** Inicialização *****
     print('Initializing')
@@ -73,47 +83,53 @@ for Re in Reynolds:
         tauab = LBM.tauab(Nx, Ny, e, n, fneq)
         fneq = LBM.dist_neq(Nx, Ny, e, cs, n, W, tauab)
         fout = LBM.collision_step(feq, fneq, omega)
-        
-#***** Condições de Contorno *****
-        fout = LBM.bounce_back(fout, 'Inferior')
-        fout = LBM.bounce_back(fout, 'Superior')
-        fout = LBM.outflow_saida(fout)
-        rho, u, fout = LBM.zou_he_entrada(u, rho, u_inlet, fout)
-        
-        fout = LBM.condicao_solido(solid, n, f, fout)
-        
+
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
-    
+        f = LBM.condicao_wall(Nx, Ny, solido, e, n, f, fout)
+        
+        Forca = LBM.forca(Nx, Ny, solido, e, n, fout, f)
+        cl, cd = LBM.coeficientes(Nx, Ny, D_est, uini, rho_ar, Forca)
+        cl_step.append(cl); cd_step.append(cd)
+        
+#***** Condições de Contorno *****
+        f = LBM.condicao_periodica_paredes(Nx, fout, f)
+        rho, u, f = LBM.zou_he_entrada(u, rho, u_inlet, f)
+#        rho, u, f = LBM.zou_he_saida(u, rho, f)
+#        f = LBM.outflow(f)
+        f = LBM.outflow_correction(rho, f)
+        
         if (step % 500 == 0): print('Step -> {}'.format(step))
         
         if (step % 100 == 0):
             u_mod = modulo_velocidade(u)
-            fg.grafico(u_mod, step, folder_imagens)
-                
-        erro_u = abs(u_erro - u)
-        erro_u[:, solid] = 0
-        if (np.all(erro_u < tol)) or (step == maxiter):
-            break
-        u_erro = u
-        step+=1
+            P = pressao(rho, cs)
+            fg.grafico(u_mod, step, folder_vel)
+            fg.grafico(P, step, folder_pres)
         
-    Forca = LBM.forca(Nx, Ny, wall_cilindro, e, n, fout, f)
-    cd, cl = LBM.coeficientes(Nx, Ny, D, wall_cilindro, u_inlet, rho, Forca)
+        if (step == maxiter):
+            break
+        step+=1
     
-    cd_s.append(cd); cl_s.append(cl)
+    fd.save_coeficientes_step(step, folder, cl_step, cd_step)
+    
+    cl_mean = LBM.coeficientes_medios(300, cl_step)
+    cd_mean = LBM.coeficientes_medios(300, cd_step)
+    
+    cl_Re.append(cl_mean); cd_Re.append(cd_mean)
     
     fim = time()
     delta_t = fim - ini
     print('Simulation Time: {0:.2f} s'.format(delta_t))
     
     print('Animating...')
-    fg.animation(folder, folder_imagens)
+    fg.animation('Velocidade',folder, folder_vel)
+    fg.animation('Pressao',folder, folder_pres)
     
     print('Saving Data...')
-    fd.save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, folder)
+    fd.save_parametros(Nx, Ny, D_est, Cx, Cy, tau, step, delta_t, folder)
+
 
 print('Saving Coefficients...')
-fd.save_coeficientes(Reynolds, cl_s, cd_s)
+fd.save_coeficientes(Reynolds, cl_Re, cd_Re)
 print('All Done!')
-    

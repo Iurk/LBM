@@ -6,34 +6,60 @@ Created on Wed Jul 24 13:09:59 2019
 @author: iurk
 """
 def criar_pasta(Re):
+    from shutil import rmtree
     from os import listdir, mkdir
     from os.path import isdir, join
     
     onlyfolders = [f for f in listdir() if isdir(join(f))]
     
     pasta = 'Re = ' + str(Re)
+    pasta_imagens = pasta + '/%s' % 'Simulacao'
+    pasta_vel = pasta_imagens + '/%s' % 'Velocidade'
+    pasta_pres = pasta_imagens + '/%s' % 'Pressao'
     
     if pasta not in onlyfolders:
         mkdir(pasta)
-        pasta_imagens = pasta + '/%s' % 'Simulacao'
         mkdir(pasta_imagens)
+        mkdir(pasta_vel)
+        mkdir(pasta_pres)
     else:
-        pasta_imagens = pasta + '/%s' % 'Simulacao'
-    return pasta, pasta_imagens
+        rmtree(pasta_imagens)
+        mkdir(pasta_imagens)
+        mkdir(pasta_vel)
+        mkdir(pasta_pres)
+        
+    return pasta, pasta_vel, pasta_pres
 
-def save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, pasta):
+def save_parametros(Nx, Ny, D, Cx, Cy, tau, step, delta_t, pasta):
     from numpy import array, savetxt
     
     path = pasta + '/%s' % 'Dados.txt'
     dominio = [Ny, Ny]
-    cilindro = [2*r, Cx, Cy]
-    lattice = [c, tau]
+    cilindro = [D, Cx, Cy]
+    lattice = [tau]
     simulation = [step, delta_t]
     
     dados = __create_text(dominio, cilindro, lattice, simulation, var1='Nx', var2='Ny', var3='D',\
-                        var4='Cx', var5='Cy', var6='c', var7='tau', var8='Iterações', var9='Tempo Total')
+                        var4='Cx', var5='Cy', var6='tau', var7='Iterações', var8='Tempo Total')
     array(dados)
     savetxt(path, dados, fmt='%s')
+    
+def save_coeficientes_step(steps, pasta, cl, cd):
+    from numpy import array, savetxt
+    
+    file = 'Coeficientes_step.txt'
+    path = pasta + '/%s' % file
+    
+    s = []
+    title = 'Step \t cl \t cd'
+    
+    s.append(title)
+    for i in range(steps):
+        saux = '{:d} \t {:.3f} \t {:.3f}'.format(i, cl[i], cd[i])
+        s.append(saux)
+    
+    array(s)
+    savetxt(path, s, fmt='%s')
     
 def save_coeficientes(Re, cl, cd):
     from numpy import array, savetxt
