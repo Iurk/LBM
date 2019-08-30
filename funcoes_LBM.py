@@ -9,85 +9,37 @@ import numpy as np
 # Arquivo de funções
 
 # Termo de Relaxação
-def relaxation_parameter(L, H, Nx, Ny, D, c, cs, Uini, Re, mode, escoamento=None):
-    while True:
-        if mode == 'Constante':
-            u_est = Uini/c
-            ni_est = (u_est*D)/Re
-        elif mode == 'Perfil':
-            U = np.zeros((2, Nx, Ny))
-            U[0,:] = __perfil_velocidade(L, H, Ny, Uini, U[0], escoamento)
-            u_est = U/c
-            umax_est = max(u_est)
-            ni_est = (umax_est*D)/Re
-            
-        tau = ni_est/(cs**2) + 1/2
-        omega = 1/tau
-        
-        if 0.5 <= tau <= 1.05*0.5:
-            return c, tau, omega
-        c *= 10
-        
-#def dominio_parameters(Nx, D):
-#    L = 30*D
-#    H = 15*D
-#    
-#    dx = L/Nx
-#    dt = 1e-4
-#    
-#    Ny = int(H/dx)
-#    return L, H, Ny, dx, dt
-#
-#def localizacao_cilindro(D, dx):
-#    Cx = 10*D
-#    Cy = 7.5*D
-#    
-#    cx = Cx/dx
-#    cy = Cy/dx
-#    d = D/dx
-#    return cx, cy, d
-#
-#def relaxation_parameter(D, c, cs, Uini, Re, rho):
-##    c = dx/dt
-##    ni = (rho*Uini*D)/Re
-#    
-##    ni_est = ni*dt/(dx**2)
-#    
-#    u_est = Uini/c
-#    ni_est= (u_est*D)/Re
-#    
-#    tau = ni_est/(cs**2) + 1/2
-#    omega = 1/tau
-#    return tau, omega
+def relaxation_parameter(L, H, Nx, Ny, D, cs, uini, Re, mode, escoamento=None):
+    ni_est = (uini*D)/Re
+    tau = ni_est/(cs**2) + 1/2
+    omega = 1/tau
+    return tau, omega
 
 # Perfis de Velocidade
-def __perfil_velocidade(L, H, Ny, Uini, Uvar, escoamento):
+def __perfil_velocidade(Nx, Ny, uini, uvar, escoamento):
     mi = 1
     dP = 1
     
     if escoamento == 'Laminar':
         A = 1
     elif escoamento == 'Turbulento':
-        A = 1e-4
-            
-    y = np.linspace(0, H, num=Ny)
+        A = 1e-6
     
     for yi in range(Ny):
-        Uvar[:, yi] = ((H**2)/(2*mi))*(-dP/L)*((y[yi]/H)**2 - (y[yi]/H))*A + Uini
-    return Uvar
+        uvar[:, yi] = ((Ny**2)/(2*mi))*(-dP/Nx)*((yi/(Ny-1))**2 - (yi/(Ny-1)))*A + uini
+    return uvar
 
 # Velocidade na unidade do método e em formato Matricial 3D
-def velocidade_lattice_units(L, H, Nx, Ny, c, Uini, mode, escoamento=None):
-    U = np.zeros((2, Nx, Ny))
+def velocidade_lattice_units(Nx, Ny, uini, mode, escoamento=None):
+    u = np.zeros((2, Nx, Ny))
 
     if mode == 'Perfil':
-        U[0,:] = __perfil_velocidade(L, H, Ny, Uini, U[0], escoamento)
+        u[0,:] = __perfil_velocidade(Nx, Ny, uini, u[0], escoamento)
         
     elif mode == 'Constante':
         for xi in range(Nx):
             for yi in range(Ny):
-                U[0,xi,yi] = Uini
-    u = U/c
+                u[0,xi,yi] = uini
     return u
 
 # Identificação das partículas que compõem o cilindro
@@ -170,8 +122,9 @@ def tauab(Nx, Ny, e, n, fneq):
     return tauab
     
 # Etapa de Colisão
-def collision_step(feq, fneq, omega):
+def collision_step(feq, fneq, omega):  #feq, fneq, omega
     fout = feq +(1 - omega)*fneq
+#    fout = omega*feq + (1 - omega)*f
     return fout
 
 # Transmissão
@@ -215,6 +168,13 @@ def extrapolacao_saida(f):
 def outflow(f):
     unknow = [3,6,7]
     f[unknow,-1,:] = f[unknow,-2,:]
+    return f
+
+def outflow_correction(rho, f):
+    unknow = [3,6,7]
+    
+    fator = 1/rho[-1,:]
+    f[unknow,-1,:] = f[unknow,-2,:]*fator
     return f
 
 def bounce_back(f, parede):
@@ -276,7 +236,8 @@ def __parede_cilindro(Nx, Ny, solido, e, n):
     return fluid
     
 # Cálculo de Força
-def forca(Nx, Ny, solido, e, c, n, f):
+def forca(Nx, Ny, solido, e, n, f_before, f_after):
+    noslip = [0, 3, 4, 1, 2, 7, 8, 5, 6]
     Force = np.zeros((2))
     
     fluid_wall = __parede_cilindro(Nx, Ny, solido, e, n)
@@ -290,7 +251,7 @@ def forca(Nx, Ny, solido, e, c, n, f):
                     
                     if solido[x_next, y_next]:
                         for a in range(2):
-                            Momentum[a] += (f[i,xi,yi] + f[i,x_next,y_next])*e[i,a]
+                            Momentum[a] += (f_after[noslip[i],xi,yi] + f_before[i,xi,yi])*e[i,a]
                 Force += Momentum
     return Force
 
@@ -303,3 +264,12 @@ def coeficientes(Nx, Ny, D_est, u, rho, Force):
     cd = Force[0]/(pressao_dinamica*Area)
     cl = Force[1]/(pressao_dinamica*Area)
     return cl, cd
+
+def coeficientes_medios(num, coeff):
+    ini = len(coeff) - num - 1
+    fim = len(coeff) - 1
+    
+    vetor = coeff[ini:fim]
+    valor_medio = np.mean(vetor)
+    return valor_medio
+    
