@@ -10,41 +10,41 @@ from time import time
 import funcoes_LBM as LBM
 import funcoes_dados as fd
 import funcoes_graficos as fg
-ini = time()
+
 
 def modulo_velocidade(u):
     return np.linalg.norm(u, axis=0).transpose()
 
+def pressao(rho, cs):
+    pressao = rho*cs**2
+    return pressao.transpose()
+
 #***** Entrada de Dados *****
 L = 1       # Comprimento do túnel [m]
 H = 2.5     # Altura do túnel [m]
-Nx = 1000    # Número de partículas em x [Lattice units]
-Ny = 400    # Número de partículas em y [Lattice units]
+Nx = 1500    # Número de partículas em x [Lattice units]
+Ny = 600    # Número de partículas em y [Lattice units]
 
-Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
+Cx = 400       # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = 80    # Diâmetro do Cilindro [Lattice units]
-D = 1
+D_est = 40    # Diâmetro do Cilindro [Lattice units]
 
-Reynolds = [50]    # Reynolds Numbers
+Reynolds = [500]    # Reynolds Numbers
 cl_Re = []
 cd_Re = []
-cl_step = []
-cd_step = []
 
 # Propriedades do Ar
 rho_ar = 1.0 #1.21
 mi_ar = 1.81e-5
 
-Uini = 1
+uini = 0.05
 mode = 'Constante'
-#escoamento = 'Laminar'
+#escoamento = 'Turbulento'
 
-maxiter = 70000      # Número de Iterações
+maxiter = 10000      # Número de Iterações
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
-c = 2                       # Lattice speed
 cs = 1/np.sqrt(3)           # Velocidade do Som em unidades Lattice
 
 #***** Lattice Constants *****
@@ -57,13 +57,15 @@ W = np.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
 solido = LBM.cilindro(Nx, Ny, Cx, Cy, D_est)
 
 for Re in Reynolds:
-    print('\nRe = {}'.format(Re))
-    folder, folder_imagens = fd.criar_pasta(Re)
-    c, tau, omega = LBM.relaxation_parameter(L, H, Nx, Ny, D_est, c, cs, Uini, Re, mode)
-#    tau, omega = LBM.relaxation_parameter(D, c, cs, Uini, Re, rho_ar)
+    ini = time()
+    cl_step = []
+    cd_step = []
     
-    u_inlet = LBM.velocidade_lattice_units(L, H, Nx, Ny, c, Uini, mode)
-    uini = Uini/c
+    print('\nRe = {}'.format(Re))
+    folder, folder_vel, folder_pres = fd.criar_pasta(Re)
+    tau, omega = LBM.relaxation_parameter(L, H, Nx, Ny, D_est, cs, uini, Re, mode)
+    
+    u_inlet = LBM.velocidade_lattice_units(Nx, Ny, uini, mode)
     
 #***** Inicialização *****
     print('Initializing')
@@ -81,27 +83,29 @@ for Re in Reynolds:
         tauab = LBM.tauab(Nx, Ny, e, n, fneq)
         fneq = LBM.dist_neq(Nx, Ny, e, cs, n, W, tauab)
         fout = LBM.collision_step(feq, fneq, omega)
-        
-        fout = LBM.condicao_solido(solido, n, f, fout)
 
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
-#        f = LBM.condicao_wall(Nx, Ny, solido, e, n, f, fout)
+        f = LBM.condicao_wall(Nx, Ny, solido, e, n, f, fout)
         
-        Forca = LBM.forca(Nx, Ny, solido, e, c, n, f)
+        Forca = LBM.forca(Nx, Ny, solido, e, n, fout, f)
         cl, cd = LBM.coeficientes(Nx, Ny, D_est, uini, rho_ar, Forca)
         cl_step.append(cl); cd_step.append(cd)
         
 #***** Condições de Contorno *****
         f = LBM.condicao_periodica_paredes(Nx, fout, f)
         rho, u, f = LBM.zou_he_entrada(u, rho, u_inlet, f)
-        rho, u, f = LBM.zou_he_saida(u, rho, f)
+#        rho, u, f = LBM.zou_he_saida(u, rho, f)
+#        f = LBM.outflow(f)
+        f = LBM.outflow_correction(rho, f)
         
         if (step % 500 == 0): print('Step -> {}'.format(step))
         
         if (step % 100 == 0):
             u_mod = modulo_velocidade(u)
-            fg.grafico(u_mod, step, folder_imagens)
+            P = pressao(rho, cs)
+            fg.grafico(u_mod, step, folder_vel)
+            fg.grafico(P, step, folder_pres)
         
         if (step == maxiter):
             break
@@ -109,17 +113,23 @@ for Re in Reynolds:
     
     fd.save_coeficientes_step(step, folder, cl_step, cd_step)
     
+    cl_mean = LBM.coeficientes_medios(300, cl_step)
+    cd_mean = LBM.coeficientes_medios(300, cd_step)
+    
+    cl_Re.append(cl_mean); cd_Re.append(cd_mean)
+    
     fim = time()
     delta_t = fim - ini
     print('Simulation Time: {0:.2f} s'.format(delta_t))
     
     print('Animating...')
-    fg.animation(folder, folder_imagens)
+    fg.animation('Velocidade',folder, folder_vel)
+    fg.animation('Pressao',folder, folder_pres)
     
-#    print('Saving Data...')
-#    fd.save_parametros(Nx, Ny, r, Cx, Cy, c, tau, step, delta_t, folder)
+    print('Saving Data...')
+    fd.save_parametros(Nx, Ny, D_est, Cx, Cy, tau, step, delta_t, folder)
+
 
 print('Saving Coefficients...')
-#fd.save_coeficientes(Reynolds, cl_s, cd_s)
+fd.save_coeficientes(Reynolds, cl_Re, cd_Re)
 print('All Done!')
-    
