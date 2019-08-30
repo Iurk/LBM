@@ -5,10 +5,8 @@ Created on Tue Jul  2 13:31:44 2019
 
 @author: iurk
 """
-#from images2gif import writeGif
 from matplotlib import cm
 import matplotlib.pyplot as plt
-from PIL import Image
 import imageio
 
 
@@ -20,10 +18,10 @@ def grafico(u, step, pasta_imagens):
     plt.colorbar(cmap=cm.RdBu)
     plt.savefig(path, dpi=250)
     
-def animation(pasta, pasta_imagens):
+def animation(nome, pasta, pasta_imagens):
     from os import listdir
     
-    file = 'simulation.gif'
+    file = nome + '.gif'
     path = pasta + '/%s' % file
     
     files_imgs = [im for im in listdir(pasta_imagens) if im.endswith('.png')]
