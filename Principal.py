@@ -11,7 +11,6 @@ import funcoes_LBM as LBM
 import funcoes_dados as fd
 import funcoes_graficos as fg
 
-
 def modulo_velocidade(u):
     return np.linalg.norm(u, axis=0).transpose()
 
@@ -22,14 +21,14 @@ def pressao(rho, cs):
 #***** Entrada de Dados *****
 L = 1       # Comprimento do túnel [m]
 H = 2.5     # Altura do túnel [m]
-Nx = 1500    # Número de partículas em x [Lattice units]
-Ny = 600    # Número de partículas em y [Lattice units]
+Nx = 800    # Número de partículas em x [Lattice units]
+Ny = 200    # Número de partículas em y [Lattice units]
 
-Cx = 400       # Centro do Cilindro em x [Lattice units]
+Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = 40    # Diâmetro do Cilindro [Lattice units]
+D_est = 30    # Diâmetro do Cilindro [Lattice units]
 
-Reynolds = [500]    # Reynolds Numbers
+Reynolds = [30]    # Reynolds Numbers
 cl_Re = []
 cd_Re = []
 
@@ -37,11 +36,11 @@ cd_Re = []
 rho_ar = 1.0 #1.21
 mi_ar = 1.81e-5
 
-uini = 0.05
+uini = 0.04
 mode = 'Constante'
 #escoamento = 'Turbulento'
 
-maxiter = 10000      # Número de Iterações
+maxiter = 5000      # Número de Iterações
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
@@ -93,11 +92,14 @@ for Re in Reynolds:
         cl_step.append(cl); cd_step.append(cd)
         
 #***** Condições de Contorno *****
-        f = LBM.condicao_periodica_paredes(Nx, fout, f)
-        rho, u, f = LBM.zou_he_entrada(u, rho, u_inlet, f)
-#        rho, u, f = LBM.zou_he_saida(u, rho, f)
+#        f = LBM.condicao_periodica_paredes('Inferior', Nx, fout, f)
+#        f = LBM.condicao_periodica_paredes('Superior', Nx, fout, f)
+        rho, u, f = LBM.zou_he('Inferior', u, rho, u_inlet, uini, f)
+        rho, u, f = LBM.zou_he('Superior', u, rho, u_inlet, uini, f)
+        rho, u, f = LBM.zou_he('Entrada', u, rho, u_inlet, uini, f)
+        rho, u, f = LBM.zou_he('Saída', u, rho, u_inlet, uini, f)
 #        f = LBM.outflow(f)
-        f = LBM.outflow_correction(rho, f)
+#        f = LBM.outflow_correction(rho, f)
         
         if (step % 500 == 0): print('Step -> {}'.format(step))
         

@@ -61,29 +61,29 @@ def dist_eq(Nx, Ny, u, e, cs, n, rho, W):
     delab = np.array([[1,0],[0,1]])
     
     A = np.zeros((n, Nx, Ny))
-#    A = np.zeros((n, Nx, Ny), dtype=np.longdouble)
+    # A = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         Aaux = 0
-#        Aaux = np.longdouble(0)
+        # Aaux = np.longdouble(0)
         for a in range(2):
             Aaux += u[a]*e[i,a]
         A[i,:,:] = Aaux
     
     B = np.zeros((n, Nx, Ny))
-#    B = np.zeros((n, Nx, Ny), dtype=np.longdouble)
+    # B = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         Baux = 0
-#        Baux = np.longdouble(0)
+        # Baux = np.longdouble(0)
         for a in range(2):
             sum1 = 0
-#            sum1 = np.longdouble(0)
+            # sum1 = np.longdouble(0)
             for b in range(2):
                 sum1 += u[a]*u[b]*(e[i,a]*e[i,b] - (cs**2)*delab[a,b])
             Baux += sum1
         B[i,:,:] = Baux
         
     feq = np.zeros((n, Nx, Ny))
-#    feq = np.zeros((n, Nx, Ny), dtype=np.longdouble)
+    # feq = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         feq[i,:,:] = W[i]*rho*(1 + (1/cs**2)*A[i] + (1/(2*cs**4))*B[i])
     return feq
@@ -93,20 +93,20 @@ def dist_neq(Nx, Ny, e, cs, n, W, tauab):
     delab = np.array([[1,0],[0,1]])
     
     A = np.zeros((n, Nx, Ny))
-#    A = np.zeros((n, Nx, Ny), dtype=np.longdouble)
+    # A = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         Aaux = 0
-#        Aaux = np.longdouble(0)
+        # Aaux = np.longdouble(0)
         for a in range(2):
             sum1 = 0
-#            sum1 = np.longdouble(0)
+            # sum1 = np.longdouble(0)
             for b in range(2):
                 sum1 += tauab[a,b]*(e[i,a]*e[i,b] - (cs**2)*delab[a,b])
             Aaux += sum1
         A[i,:,:] = Aaux
        
     fneq = np.zeros((n, Nx, Ny))
-#    fneq = np.zeros((n, Nx, Ny), dtype=np.longdouble)
+    # fneq = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         fneq[i,:,:] = W[i]*(1/(2*cs**4))*A[i]
     return fneq
@@ -114,7 +114,7 @@ def dist_neq(Nx, Ny, e, cs, n, W, tauab):
 # Momentos de Não Equilibrio
 def tauab(Nx, Ny, e, n, fneq):
     tauab = np.zeros((2, 2, Nx, Ny))
-#    tauab = np.zeros((2, 2, X, Y), dtype=np.longdouble)
+    # tauab = np.zeros((2, 2, Nx, Ny), dtype=np.longdouble)
     for a in range(2):
         for b in range(2):
             for i in range(n):
@@ -140,8 +140,18 @@ def transmissao(Nx, Ny, f, fout):
     f[8,1:Nx,0:Ny-1] = fout[8,0:Nx-1,1:Ny]
     return f
 
+def zou_he(mode, u, rho, u_entrada, uini, f):
+    if mode == 'Entrada':
+        return __entrada(u, rho, u_entrada, f)
+    elif mode == 'Saída':
+        return __saida(u, rho, f)
+    elif mode == 'Inferior':
+        return __inferior(u, rho, uini, f)
+    elif mode == 'Superior':
+        return __superior(u, rho, uini, f)
+    
 # Condições de Contorno
-def zou_he_entrada(u, rho, u_entrada, f):
+def __entrada(u, rho, u_entrada, f):
     u[:,0,:] = u_entrada[:,0,:]
     rho[0,:] = (f[0,0,:] + f[2,0,:] + f[4,0,:] + 2*(f[3,0,:] + f[6,0,:] + f[7,0,:]))/(1 - u[0,0,:])
     
@@ -150,7 +160,7 @@ def zou_he_entrada(u, rho, u_entrada, f):
     f[8,0,:] = f[6,0,:] + (1/2)*(f[2,0,:] - f[4,0,:]) + (1/6)*rho[0,:]*u[0,0,:]
     return rho, u, f
 
-def zou_he_saida(u, rho, f):
+def __saida(u, rho, f):
     rho[-1,:] = 1.0
     u[0,-1,:] = (f[0,-1,:] + f[2,-1,:] + f[4,-1,:] + 2*(f[1,-1,:] + f[5,-1,:] + f[8,-1,:]))/rho[-1,:] - 1
     u[1,-1,:] = 0
@@ -159,6 +169,25 @@ def zou_he_saida(u, rho, f):
     f[6,-1,:] = f[8,-1,:] - (1/2)*(f[2,-1,:] - f[4,-1,:]) - (1/6)*rho[-1,:]*u[0,-1,:]
     f[7,-1,:] = f[5,-1,:] + (1/2)*(f[2,-1,:] - f[4,-1,:]) - (1/6)*rho[-1,:]*u[0,-1,:]
     return rho, u, f
+
+def __inferior(u, rho, uini, f):
+    u[:,:,0] = uini
+    rho[:,0] = f[0,:,0] + f[1,:,0] + f[3,:,0] + 2*(f[4,:,0] + f[7,:,0] + f[8,:,0])
+    
+    f[2,:,0] = f[4,:,0]
+    f[5,:,0] = f[7,:,0] - (1/2)*(f[1,:,0] - f[3,:,0]) + (1/2)*rho[:,0]*u[0,:,0]
+    f[6,:,0] = f[8,:,0] + (1/2)*(f[1,:,0] - f[3,:,0]) - (1/2)*rho[:,0]*u[0,:,0]
+    return rho, u, f
+
+def __superior(u, rho, uini, f):
+    u[:,:,-1] = uini
+    rho[:,-1] = f[0,:,-1] + f[1,:,-1] + f[3,:,-1] + 2*(f[2,:,-1] + f[5,:,-1] + f[6,:,-1])
+    
+    f[4,:,-1] = f[2,:,-1]
+    f[7,:,-1] = f[5,:,-1] + (1/2)*(f[1,:,-1] - f[3,:,-1]) - (1/2)*rho[:,-1]*u[0,:,-1]
+    f[8,:,-1] = f[6,:,-1] - (1/2)*(f[1,:,-1] - f[3,:,-1]) + (1/2)*rho[:,-1]*u[0,:,-1]
+    return rho, u, f
+    
 
 def extrapolacao_saida(f):
     unknow = [3,6,7]
@@ -189,17 +218,17 @@ def bounce_back(f, parede):
         f[6,:,0] = f[8,:,0]
     return f
 
-def condicao_periodica_paredes(Nx, fout, f):
-    # Inferior
-    f[2,:,0] = fout[2,:,-1]
-    f[5,1:Nx,0] = fout[5,0:Nx-1,-1]
-    f[6,0:Nx-1,0] = fout[6,1:Nx,-1]
-    
-    #Superior
-    f[4,:,-1] = fout[4,:,0]
-    f[7,0:Nx-1,-1] = fout[7,1:Nx,0]
-    f[8,1:Nx,-1] = fout[8,0:Nx-1,0]
-    return f    
+def condicao_periodica_paredes(parede, Nx, fout, f):
+    if parede == 'Inferior':
+        f[2,:,0] = fout[2,:,-1]
+        f[5,1:Nx,0] = fout[5,0:Nx-1,-1]
+        f[6,0:Nx-1,0] = fout[6,1:Nx,-1]
+        
+    elif parede == 'Superior':
+        f[4,:,-1] = fout[4,:,0]
+        f[7,0:Nx-1,-1] = fout[7,1:Nx,0]
+        f[8,1:Nx,-1] = fout[8,0:Nx-1,0] 
+    return f
 
 def condicao_wall(Nx, Ny, solido, e, n, f, fout):
     noslip = [0, 3, 4, 1, 2, 7, 8, 5, 6]

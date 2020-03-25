@@ -7,10 +7,10 @@ Created on Wed Jul 24 13:09:59 2019
 """
 def criar_pasta(Re):
     from shutil import rmtree
-    from os import listdir, mkdir
+    from os import listdir, mkdir, getcwd
     from os.path import isdir, join
     
-    onlyfolders = [f for f in listdir() if isdir(join(f))]
+    onlyfolders = [f for f in listdir(getcwd()) if isdir(join(f))]
     
     pasta = 'Re = ' + str(Re)
     pasta_imagens = pasta + '/%s' % 'Simulacao'
