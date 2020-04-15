@@ -5,18 +5,18 @@ Created on Tue Jul  2 13:19:27 2019
 
 @author: iurk
 """
-import numpy as np
+import cupy as cp
 from time import time
 import funcoes_LBM as LBM
 import funcoes_dados as fd
 import funcoes_graficos as fg
 
 def modulo_velocidade(u):
-    return np.linalg.norm(u, axis=0).transpose()
+    return cp.linalg.norm(u, axis=0).transpose().get()
 
 def pressao(rho, cs):
     pressao = rho*cs**2
-    return pressao.transpose()
+    return pressao.transpose().get()
 
 #***** Entrada de Dados *****
 L = 1       # Comprimento do túnel [m]
@@ -26,7 +26,7 @@ Ny = 300    # Número de partículas em y [Lattice units]
 
 Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = 80    # Diâmetro do Cilindro [Lattice units]
+D_est = 80      # Diâmetro do Cilindro [Lattice units]
 
 Reynolds = [300]    # Reynolds Numbers
 cl_Re = []
@@ -44,13 +44,13 @@ maxiter = 5000      # Número de Iterações
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
-cs = 1/np.sqrt(3)           # Velocidade do Som em unidades Lattice
+cs = 1/cp.sqrt(3)           # Velocidade do Som em unidades Lattice
 
 #***** Lattice Constants *****
-ex = np.array([0, 1, 0, -1, 0, 1, -1, -1, 1])
-ey = np.array([0, 0, 1, 0, -1, 1, 1, -1, -1])
-e = np.stack((ex, ey), axis=1)
-W = np.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
+ex = cp.array([0, 1, 0, -1, 0, 1, -1, -1, 1])
+ey = cp.array([0, 0, 1, 0, -1, 1, 1, -1, -1])
+e = cp.stack((ex, ey), axis=1)
+W = cp.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
 
 #***** Construção do Cilindro e Perfil de Velocidades *****
 solido = LBM.cilindro(Nx, Ny, Cx, Cy, D_est)
@@ -75,29 +75,44 @@ for Re in Reynolds:
     step = 0
     while True:
         rho = LBM.rho(f)
-        u = np.dot(e.transpose(), f.transpose(1,0,2))/rho
+        u = cp.dot(e.transpose(), f.transpose(1,0,2))/rho
+        
+        print("oi")
         
         feq = LBM.dist_eq(Nx, Ny, u, e, cs, n, rho, W)
+        print("oi")
         fneq = f - feq
+        print("oi")
         tauab = LBM.tauab(Nx, Ny, e, n, fneq)
+        print("oi")
         fneq = LBM.dist_neq(Nx, Ny, e, cs, n, W, tauab)
+        print("oi")
         fout = LBM.collision_step(feq, fneq, omega)
+        print("oi")
 
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
+        print("oi")
         f = LBM.condicao_wall(Nx, Ny, solido, e, n, f, fout)
+        print("oi")
         
         Forca = LBM.forca(Nx, Ny, solido, e, n, fout, f)
+        print("oi")
         cl, cd = LBM.coeficientes(Nx, Ny, D_est, uini, rho_ar, Forca)
+        print("oi")
         cl_step.append(cl); cd_step.append(cd)
         
 #***** Condições de Contorno *****
 #        f = LBM.condicao_periodica_paredes('Inferior', Nx, fout, f)
 #        f = LBM.condicao_periodica_paredes('Superior', Nx, fout, f)
         rho, u, f = LBM.zou_he('Inferior', u, rho, u_inlet, uini, f)
+        print("oi")
         rho, u, f = LBM.zou_he('Superior', u, rho, u_inlet, uini, f)
+        print("oi")
         rho, u, f = LBM.zou_he('Entrada', u, rho, u_inlet, uini, f)
+        print("oi")
         rho, u, f = LBM.zou_he('Saída', u, rho, u_inlet, uini, f)
+        print("oi")
 #        f = LBM.outflow(f)
 #        f = LBM.outflow_correction(rho, f)
         
