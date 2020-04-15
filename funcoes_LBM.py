@@ -5,7 +5,8 @@ Created on Tue Jul  9 14:20:30 2019
 
 @author: iurk
 """
-import numpy as np
+import cupy as cp
+from numba import jit
 # Arquivo de funções
 
 # Termo de Relaxação
@@ -31,7 +32,7 @@ def __perfil_velocidade(Nx, Ny, uini, uvar, escoamento):
 
 # Velocidade na unidade do método e em formato Matricial 3D
 def velocidade_lattice_units(Nx, Ny, uini, mode, escoamento=None):
-    u = np.zeros((2, Nx, Ny))
+    u = cp.zeros((2, Nx, Ny))
 
     if mode == 'Perfil':
         u[0,:] = __perfil_velocidade(Nx, Ny, uini, u[0], escoamento)
@@ -44,7 +45,7 @@ def velocidade_lattice_units(Nx, Ny, uini, mode, escoamento=None):
 
 # Identificação das partículas que compõem o cilindro
 def cilindro(Nx, Ny, Cx, Cy, D):
-    solido = np.zeros((Nx, Ny), dtype=bool)
+    solido = cp.zeros((Nx, Ny), dtype=bool)
     
     for xi in range(Nx):
         for yi in range(Ny):
@@ -54,13 +55,13 @@ def cilindro(Nx, Ny, Cx, Cy, D):
 
 # Rho
 def rho(f):
-    return np.sum(f, axis=0)
+    return cp.sum(f, axis=0)
 
 # Distribuição de Equilíbrio
 def dist_eq(Nx, Ny, u, e, cs, n, rho, W):
-    delab = np.array([[1,0],[0,1]])
+    delab = cp.array([[1,0],[0,1]])
     
-    A = np.zeros((n, Nx, Ny))
+    A = cp.zeros((n, Nx, Ny))
     # A = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         Aaux = 0
@@ -69,7 +70,7 @@ def dist_eq(Nx, Ny, u, e, cs, n, rho, W):
             Aaux += u[a]*e[i,a]
         A[i,:,:] = Aaux
     
-    B = np.zeros((n, Nx, Ny))
+    B = cp.zeros((n, Nx, Ny))
     # B = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         Baux = 0
@@ -82,7 +83,7 @@ def dist_eq(Nx, Ny, u, e, cs, n, rho, W):
             Baux += sum1
         B[i,:,:] = Baux
         
-    feq = np.zeros((n, Nx, Ny))
+    feq = cp.zeros((n, Nx, Ny))
     # feq = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         feq[i,:,:] = W[i]*rho*(1 + (1/cs**2)*A[i] + (1/(2*cs**4))*B[i])
@@ -90,9 +91,9 @@ def dist_eq(Nx, Ny, u, e, cs, n, rho, W):
 
 # Distribuição de Não Equilíbrio
 def dist_neq(Nx, Ny, e, cs, n, W, tauab):
-    delab = np.array([[1,0],[0,1]])
+    delab = cp.array([[1,0],[0,1]])
     
-    A = np.zeros((n, Nx, Ny))
+    A = cp.zeros((n, Nx, Ny))
     # A = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         Aaux = 0
@@ -105,7 +106,7 @@ def dist_neq(Nx, Ny, e, cs, n, W, tauab):
             Aaux += sum1
         A[i,:,:] = Aaux
        
-    fneq = np.zeros((n, Nx, Ny))
+    fneq = cp.zeros((n, Nx, Ny))
     # fneq = np.zeros((n, Nx, Ny), dtype=np.longdouble)
     for i in range(n):
         fneq[i,:,:] = W[i]*(1/(2*cs**4))*A[i]
@@ -113,7 +114,7 @@ def dist_neq(Nx, Ny, e, cs, n, W, tauab):
     
 # Momentos de Não Equilibrio
 def tauab(Nx, Ny, e, n, fneq):
-    tauab = np.zeros((2, 2, Nx, Ny))
+    tauab = cp.zeros((2, 2, Nx, Ny))
     # tauab = np.zeros((2, 2, Nx, Ny), dtype=np.longdouble)
     for a in range(2):
         for b in range(2):
@@ -128,6 +129,7 @@ def collision_step(feq, fneq, omega):  #feq, fneq, omega
     return fout
 
 # Transmissão
+@jit
 def transmissao(Nx, Ny, f, fout):
     f[0,:,:] = fout[0,:,:]
     f[1,1:Nx,:] = fout[1,0:Nx-1,:]
@@ -252,7 +254,7 @@ def condicao_solido(solido, n, f, fout):
     return fout
 
 def __parede_cilindro(Nx, Ny, solido, e, n):
-    fluid = np.zeros((Nx, Ny), dtype=bool)
+    fluid = cp.zeros((Nx, Ny), dtype=bool)
     
     for xi in range(Nx-1):
         for yi in range(Ny-1):
@@ -267,13 +269,13 @@ def __parede_cilindro(Nx, Ny, solido, e, n):
 # Cálculo de Força
 def forca(Nx, Ny, solido, e, n, f_before, f_after):
     noslip = [0, 3, 4, 1, 2, 7, 8, 5, 6]
-    Force = np.zeros((2))
+    Force = cp.zeros((2))
     
     fluid_wall = __parede_cilindro(Nx, Ny, solido, e, n)
     for xi in range(Nx - 1):
         for yi in range(Ny - 1):
             if fluid_wall[xi, yi]:
-                Momentum = np.zeros((2))
+                Momentum = cp.zeros((2))
                 for i in range(n):
                     x_next = xi + e[i,0]
                     y_next = yi + e[i,1]
@@ -299,6 +301,6 @@ def coeficientes_medios(num, coeff):
     fim = len(coeff) - 1
     
     vetor = coeff[ini:fim]
-    valor_medio = np.mean(vetor)
+    valor_medio = cp.mean(vetor)
     return valor_medio
     
