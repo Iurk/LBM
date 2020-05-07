@@ -1,0 +1,4 @@
+
+__global__ void solid_creation(int Nx, int Ny, int Cx, int Cy, int D){
+	
+}
