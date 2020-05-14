@@ -5,53 +5,185 @@ Created on Tue Jul  2 13:19:27 2019
 
 @author: iurk
 """
-import cupy as cp
+import numpy as np
 from time import time
-import funcoes_LBM as LBM
+import pycuda.autoinit
 import funcoes_dados as fd
-import funcoes_graficos as fg
+from Lattice import Lattice
+import pycuda.driver as cuda
+from Simulation import Simulation
+from pycuda.compiler import SourceModule
 
-def modulo_velocidade(u):
-    return cp.linalg.norm(u, axis=0).transpose().get()
+def get_grid_block(Nx, Ny, block_x=1, block_y=1, block_z=1):
+    block = [block_x, block_y, block_z]
+    
+    if block_x != 1:
+        block[0] = block_x
+    if block_y != 1:
+        block[1] = block_y
+    if block_z != 1:
+        block[2] = block_z
+        
+    block = tuple(block)
+    
+    gpu = cuda.Device(0)
+    Max_thread_per_block = gpu.max_threads_per_block
+    print("Verifing...")
+    if (block_x*block_y*block_z <= Max_thread_per_block):
+        print("Max Thread per block: {}".format(Max_thread_per_block))
+        print("Block size: {}".format(block_x*block_y*block_z))
+        print("Ok!")
+        grid_x = int(np.ceil(Nx/block[0]))
+        grid_y = int(np.ceil(Ny/block[1]))
+        grid = (grid_x, grid_y, 1)
+        print("Problem Dim: {}x{}; Block Dim: {}x{}; Grid Dim:{}x{}".format(Nx, Ny, block_x, block_y, grid_x, grid_y))
+        return grid, block
+        
+    else:
+        print("Max Thread per block: {}".format(Max_thread_per_block))
+        print("Block size: {}".format(block_x*block_y*block_z))
+        print("Not Ok!")
+        
+        
 
-def pressao(rho, cs):
-    pressao = rho*cs**2
-    return pressao.transpose().get()
+#***** CUDA Code *****
+#***** CUDA Files *****
+headerFile = open('./GPU/gpuHeaders.cuh')
+functionsFile = open('./GPU/gpuFunc.cu')
 
-#***** Entrada de Dados *****
-L = 1       # Comprimento do túnel [m]
-H = 2.5     # Altura do túnel [m]
-Nx = 900    # Número de partículas em x [Lattice units]
-Ny = 300    # Número de partículas em y [Lattice units]
+#***** Compilation *****
+mod = SourceModule(headerFile.read() + functionsFile.read())
+                                  
+#***** Start Code *****   
+ini = time()
 
-Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
-Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = 80      # Diâmetro do Cilindro [Lattice units]
+#***** Input Data *****
+Nx = 256                   # Número de partículas em x [Lattice units]
+Ny = 128                    # Número de partículas em y [Lattice units]
 
-Reynolds = [300]    # Reynolds Numbers
+Cx = Nx/4                   # Centro do Cilindro em x [Lattice units]
+Cy = Ny/2                   # Centro do Cilindro em y [Lattice units]
+D = 128                     # Diâmetro do Cilindro [Lattice units]
+
+#***** Air Properties *****
+rho_ar = 1.0                #1.21
+mi_ar = 1.81e-5
+
+#***** Flux Properties *****
+uini = 0.04
+Reynolds = [300]            # Reynolds Numbers
 cl_Re = []
 cd_Re = []
 
-# Propriedades do Ar
-rho_ar = 1.0 #1.21
-mi_ar = 1.81e-5
+maxiter = 5000              # Número de Iterações
 
-uini = 0.04
-mode = 'Constante'
-#escoamento = 'Turbulento'
+#***** CUDA Data *****
+#***** Block Dim *****
+block_x = 32
+block_y = 16
+#***** Events *****
+start = cuda.Event()
+stop = cuda.Event()
 
-maxiter = 5000      # Número de Iterações
+#***** Creating Lattice *****
+lattice = 'D2Q9'
+D2Q9 = Lattice(lattice)
+q, cs, W, ex, ey = D2Q9.get_attributes()
+A, B, C = D2Q9.get_param_dist_eq()
 
-#***** D2Q9 Parameters *****
-n = 9                       # Número de Direções do Lattice
-cs = 1/cp.sqrt(3)           # Velocidade do Som em unidades Lattice
+#***** Setting up the Simulation *****
+simulation = Simulation(Nx, Ny, Cx, Cy, D, uini)
 
-#***** Lattice Constants *****
-ex = cp.array([0, 1, 0, -1, 0, 1, -1, -1, 1])
-ey = cp.array([0, 0, 1, 0, -1, 1, 1, -1, -1])
-e = cp.stack((ex, ey), axis=1)
-W = cp.array([16/36, 4/36, 4/36, 4/36, 4/36, 1/36, 1/36, 1/36, 1/36])
+# #***** Setting up the GPU grid and blocks *****
+grid, block = get_grid_block(Nx, Ny, block_x, block_y)
 
+#***** Defining the cylinder *****
+simulation.solid_create()
+cilindro = simulation.get_solid()
+
+#***** Initializing rho and u matrix *****
+rho, u = simulation.initialize()
+
+feq = np.zeros((q, Nx, Ny), dtype=np.float32)
+
+#***** Device Memory Allocation *****
+#***** Registers for Pinned Allocation *****
+rho = cuda.register_host_memory(rho)
+u = cuda.register_host_memory(u)
+feq = cuda.register_host_memory(feq)
+
+#***** Memory Allocation *****
+rho_d = cuda.mem_alloc(rho.nbytes)
+u_d = cuda.mem_alloc(u.nbytes)
+feq_d = cuda.mem_alloc(feq.nbytes)
+
+#***** Global Memory Allocation *****
+qd = mod.get_global('qd')
+csd = mod.get_global('csd')
+Wd = mod.get_global('Wd')
+exd = mod.get_global('exd')
+eyd = mod.get_global('eyd')
+Ad = mod.get_global('Ad')
+Bd = mod.get_global('Bd')
+Cd = mod.get_global('Cd')
+
+#***** Sending Data to Device *****
+#***** Global Data *****
+cuda.memcpy_htod(qd[0], q)
+cuda.memcpy_htod(csd[0], cs)
+cuda.memcpy_htod(Wd[0], W)
+cuda.memcpy_htod(exd[0], ex)
+cuda.memcpy_htod(eyd[0], ey)
+cuda.memcpy_htod(Ad[0], A)
+cuda.memcpy_htod(Bd[0], B)
+cuda.memcpy_htod(Cd[0], C)
+
+#***** Normal Data *****
+cuda.memcpy_htod_async(rho_d, rho)
+cuda.memcpy_htod_async(u_d, u)
+cuda.memcpy_htod_async(feq_d, feq)
+
+#***** Getting CUDA Functions *****
+Rho = mod.get_function('calcRho')
+Uest = mod.get_function('calcU')
+Equilibrium = mod.get_function('Equilibrium')
+
+
+#***** Preparing Functions *****
+Rho.prepare('PP')
+Uest.prepare('PPP')
+Equilibrium.prepare('PPP')
+
+#***** Reynolds Loop *****
+for Re in Reynolds:
+    cl_step = []
+    cd_step = []
+    
+    print('\nRe = {}'.format(Re))
+    folder, folder_vel, folder_pres = fd.criar_pasta(Re)
+    simulation.relaxation_term(cs, Re)
+    
+    omega = simulation.omega
+    
+    print('Runing...')
+#***** Main Loop *****
+    # while True:
+    Equilibrium.prepared_call(grid, block, rho_d, u_d, feq_d)
+    Rho.prepared_call(grid, block, rho_d, feq_d)
+    Uest.prepared_call(grid, block, rho_d, u_d, feq_d)
+        
+    
+#***** Calling Functions *****
+
+
+
+
+#***** Sending Data to Host *****
+    cuda.memcpy_dtoh_async(rho, rho_d)
+    cuda.memcpy_dtoh_async(feq, feq_d)
+    cuda.memcpy_dtoh_async(u, u_d)
+
+'''
 #***** Construção do Cilindro e Perfil de Velocidades *****
 solido = LBM.cilindro(Nx, Ny, Cx, Cy, D_est)
 
@@ -77,42 +209,28 @@ for Re in Reynolds:
         rho = LBM.rho(f)
         u = cp.dot(e.transpose(), f.transpose(1,0,2))/rho
         
-        print("oi")
         
         feq = LBM.dist_eq(Nx, Ny, u, e, cs, n, rho, W)
-        print("oi")
         fneq = f - feq
-        print("oi")
         tauab = LBM.tauab(Nx, Ny, e, n, fneq)
-        print("oi")
         fneq = LBM.dist_neq(Nx, Ny, e, cs, n, W, tauab)
-        print("oi")
         fout = LBM.collision_step(feq, fneq, omega)
-        print("oi")
 
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
-        print("oi")
         f = LBM.condicao_wall(Nx, Ny, solido, e, n, f, fout)
-        print("oi")
         
         Forca = LBM.forca(Nx, Ny, solido, e, n, fout, f)
-        print("oi")
         cl, cd = LBM.coeficientes(Nx, Ny, D_est, uini, rho_ar, Forca)
-        print("oi")
         cl_step.append(cl); cd_step.append(cd)
         
 #***** Condições de Contorno *****
 #        f = LBM.condicao_periodica_paredes('Inferior', Nx, fout, f)
 #        f = LBM.condicao_periodica_paredes('Superior', Nx, fout, f)
         rho, u, f = LBM.zou_he('Inferior', u, rho, u_inlet, uini, f)
-        print("oi")
         rho, u, f = LBM.zou_he('Superior', u, rho, u_inlet, uini, f)
-        print("oi")
         rho, u, f = LBM.zou_he('Entrada', u, rho, u_inlet, uini, f)
-        print("oi")
-        rho, u, f = LBM.zou_he('Saída', u, rho, u_inlet, uini, f)
-        print("oi")
+        
 #        f = LBM.outflow(f)
 #        f = LBM.outflow_correction(rho, f)
         
@@ -150,3 +268,7 @@ for Re in Reynolds:
 print('Saving Coefficients...')
 fd.save_coeficientes(Reynolds, cl_Re, cd_Re)
 print('All Done!')
+'''
+
+fim = time()
+print("Finalizado em {} segundos".format(fim - ini))
