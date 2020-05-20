@@ -44,8 +44,6 @@ def get_grid_block(Nx, Ny, block_x=1, block_y=1, block_z=1):
         print("Block size: {}".format(block_x*block_y*block_z))
         print("Not Ok!")
         
-        
-
 #***** CUDA Code *****
 #***** CUDA Files *****
 headerFile = open('./GPU/gpuHeaders.cuh')
@@ -106,6 +104,10 @@ rho, u = simulation.initialize()
 
 feq = np.zeros((q, Nx, Ny), dtype=np.float32)
 
+#***** Calculation array's size *****
+sizef = int(4*q*Nx*Ny)
+sizetau = int(4*2*2*Nx*Ny)
+
 #***** Device Memory Allocation *****
 #***** Registers for Pinned Allocation *****
 rho = cuda.register_host_memory(rho)
@@ -115,7 +117,11 @@ feq = cuda.register_host_memory(feq)
 #***** Memory Allocation *****
 rho_d = cuda.mem_alloc(rho.nbytes)
 u_d = cuda.mem_alloc(u.nbytes)
-feq_d = cuda.mem_alloc(feq.nbytes)
+f_d = cuda.mem_alloc(sizef)
+feq_d = cuda.mem_alloc(sizef)
+fneq_d = cuda.mem_alloc(sizef)
+fout_d = cuda.mem_alloc(sizef)
+tauab_d = cuda.mem_alloc(sizetau)
 
 #***** Global Memory Allocation *****
 qd = mod.get_global('qd')
@@ -126,6 +132,7 @@ eyd = mod.get_global('eyd')
 Ad = mod.get_global('Ad')
 Bd = mod.get_global('Bd')
 Cd = mod.get_global('Cd')
+omegad = mod.get_global('omegad')
 
 #***** Sending Data to Device *****
 #***** Global Data *****
@@ -141,47 +148,88 @@ cuda.memcpy_htod(Cd[0], C)
 #***** Normal Data *****
 cuda.memcpy_htod_async(rho_d, rho)
 cuda.memcpy_htod_async(u_d, u)
-cuda.memcpy_htod_async(feq_d, feq)
 
 #***** Getting CUDA Functions *****
 Rho = mod.get_function('calcRho')
 Uest = mod.get_function('calcU')
 Equilibrium = mod.get_function('Equilibrium')
-
+approxNonEquilibrium = mod.get_function('approxNonEquilibrium')
+NonEquilibrium = mod.get_function('NonEquilibrium')
+Tauab = mod.get_function('Tauab')
+Collision = mod.get_function('Collision')
 
 #***** Preparing Functions *****
 Rho.prepare('PP')
 Uest.prepare('PPP')
 Equilibrium.prepare('PPP')
+approxNonEquilibrium.prepare('PPP')
+NonEquilibrium.prepare('PP')
+Tauab.prepare('PP')
+Collision.prepare('PPP')
+
+f = np.empty_like(feq)
+fneq = np.empty_like(feq)
+fout = np.empty_like(feq)
+tauab = np.zeros((2, 2, Nx, Ny), dtype=np.float32)
 
 #***** Reynolds Loop *****
 for Re in Reynolds:
     cl_step = []
     cd_step = []
     
+    #***** Creating Data Folders *****
     print('\nRe = {}'.format(Re))
     folder, folder_vel, folder_pres = fd.criar_pasta(Re)
-    simulation.relaxation_term(cs, Re)
     
+    #***** Calculating Relaxation Term *****
+    simulation.relaxation_term(cs, Re)
     omega = simulation.omega
     
-    print('Runing...')
-#***** Main Loop *****
-    # while True:
-    Equilibrium.prepared_call(grid, block, rho_d, u_d, feq_d)
-    Rho.prepared_call(grid, block, rho_d, feq_d)
-    Uest.prepared_call(grid, block, rho_d, u_d, feq_d)
-        
+    #***** Sendig omega to device *****
+    cuda.memcpy_htod(omegad[0], omega)
     
-#***** Calling Functions *****
+    print('Runing...')
+    
+    print('Initializing...')
+    Equilibrium.prepared_call(grid, block, rho_d, u_d, feq_d)
+    cuda.memcpy_dtod_async(f_d, feq_d, sizef)
+    
+    cuda.memcpy_dtoh_async(f, f_d)
+    cuda.memcpy_dtoh_async(feq, feq_d)
+    
+    #***** Main Loop *****
+    step = 0
+    while True:
+        #***** Updating Momentum *****
+        Rho.prepared_call(grid, block, rho_d, f_d)
+        Uest.prepared_call(grid, block, rho_d, u_d, f_d)
+        
+        #***** Solving LBM BGK Regularized *****
+        Equilibrium.prepared_call(grid, block, rho_d, u_d, feq_d)
+        approxNonEquilibrium.prepared_call(grid, block, f_d, feq_d, fneq_d)
+        Tauab.prepared_call(grid, block, tauab_d, fneq_d)
+        NonEquilibrium.prepared_call(grid, block, tauab_d, fneq_d)
+        Collision.prepared_call(grid, block, fout_d, feq_d, fneq_d)
+        
+        #***** Propagation Step *****
+        
+
+        
+        cuda.memcpy_dtoh_async(rho, rho_d)
+        cuda.memcpy_dtoh_async(u, u_d)
+        cuda.memcpy_dtoh_async(f, f_d)
+        cuda.memcpy_dtoh_async(feq, feq_d)
+        cuda.memcpy_dtoh_async(fneq, fneq_d)
+        cuda.memcpy_dtoh_async(fout, fout_d)
+        cuda.memcpy_dtoh_async(tauab, tauab_d)
+        
+        print()
 
 
 
 
 #***** Sending Data to Host *****
-    cuda.memcpy_dtoh_async(rho, rho_d)
-    cuda.memcpy_dtoh_async(feq, feq_d)
-    cuda.memcpy_dtoh_async(u, u_d)
+   
 
 '''
 #***** Construção do Cilindro e Perfil de Velocidades *****
