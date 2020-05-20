@@ -33,7 +33,7 @@ class Simulation():
     
     def __init_u(self):
         u = zeros((2, self.nx, self.ny), dtype=float32)
-        u[0, 0, :] = self.uini
+        u[0, :, :] = self.uini
         return u
     
     def __init_rho(self):
@@ -43,7 +43,7 @@ class Simulation():
     def relaxation_term(self, cs, Re):
         ni_est = (self.uini*self.d)/Re
         self.tau = ni_est/(cs**2) + 1/2
-        self.omega = 1/self.tau
+        self.omega = float32(1/self.tau)
         
     
             
