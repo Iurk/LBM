@@ -61,7 +61,7 @@ Ny = 128                    # Número de partículas em y [Lattice units]
 
 Cx = Nx/4                   # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2                   # Centro do Cilindro em y [Lattice units]
-D = 128                     # Diâmetro do Cilindro [Lattice units]
+D = 64                     # Diâmetro do Cilindro [Lattice units]
 
 #***** Air Properties *****
 rho_ar = 1.0                #1.21
@@ -73,7 +73,7 @@ Reynolds = [300]            # Reynolds Numbers
 cl_Re = []
 cd_Re = []
 
-maxiter = 5000              # Número de Iterações
+maxiter = 1              # Número de Iterações
 
 #***** CUDA Data *****
 #***** Block Dim *****
@@ -97,12 +97,12 @@ grid, block = get_grid_block(Nx, Ny, block_x, block_y)
 
 #***** Defining the cylinder *****
 simulation.solid_create()
-cilindro = simulation.get_solid()
+cylinder = simulation.get_solid()
 
 #***** Initializing rho and u matrix *****
 rho, u = simulation.initialize()
 
-feq = np.zeros((q, Nx, Ny), dtype=np.float32)
+feq = np.zeros((q, Ny, Nx), dtype=np.float32)
 
 #***** Calculation array's size *****
 sizef = int(4*q*Nx*Ny)
@@ -112,6 +112,7 @@ sizetau = int(4*2*2*Nx*Ny)
 #***** Registers for Pinned Allocation *****
 rho = cuda.register_host_memory(rho)
 u = cuda.register_host_memory(u)
+cylinder = cuda.register_host_memory(cylinder)
 feq = cuda.register_host_memory(feq)
 
 #***** Memory Allocation *****
@@ -122,6 +123,8 @@ feq_d = cuda.mem_alloc(sizef)
 fneq_d = cuda.mem_alloc(sizef)
 fout_d = cuda.mem_alloc(sizef)
 tauab_d = cuda.mem_alloc(sizetau)
+cylinder_d = cuda.mem_alloc(cylinder.nbytes)
+fluid_wall_d = cuda.mem_alloc(4*Ny*Nx)
 
 #***** Global Memory Allocation *****
 qd = mod.get_global('qd')
@@ -148,6 +151,7 @@ cuda.memcpy_htod(Cd[0], C)
 #***** Normal Data *****
 cuda.memcpy_htod_async(rho_d, rho)
 cuda.memcpy_htod_async(u_d, u)
+cuda.memcpy_htod_async(cylinder_d, cylinder)
 
 #***** Getting CUDA Functions *****
 Rho = mod.get_function('calcRho')
@@ -157,6 +161,11 @@ approxNonEquilibrium = mod.get_function('approxNonEquilibrium')
 NonEquilibrium = mod.get_function('NonEquilibrium')
 Tauab = mod.get_function('Tauab')
 Collision = mod.get_function('Collision')
+Propagation = mod.get_function('Propagation')
+FluidWall = mod.get_function('FluidWall')
+BounceBack = mod.get_function('BounceBack')
+ZouHeIn = mod.get_function('ZouHeIn')
+ZouHeOut = mod.get_function('ZouHeOut')
 
 #***** Preparing Functions *****
 Rho.prepare('PP')
@@ -166,11 +175,22 @@ approxNonEquilibrium.prepare('PPP')
 NonEquilibrium.prepare('PP')
 Tauab.prepare('PP')
 Collision.prepare('PPP')
+Propagation.prepare('PP')
+FluidWall.prepare('PP')
+BounceBack.prepare('PPPP')
+ZouHeIn.prepare('fPPP')
+ZouHeOut.prepare('iPPP')
 
 f = np.empty_like(feq)
 fneq = np.empty_like(feq)
 fout = np.empty_like(feq)
-tauab = np.zeros((2, 2, Nx, Ny), dtype=np.float32)
+tauab = np.zeros((2, 2, Ny, Nx), dtype=np.float32)
+
+#***** Getting Fluid Wall *****
+FluidWall.prepared_call(grid, block, fluid_wall_d, cylinder_d)
+
+wall = np.empty_like(cylinder)
+cuda.memcpy_dtoh_async(wall, fluid_wall_d)
 
 #***** Reynolds Loop *****
 for Re in Reynolds:
@@ -193,9 +213,7 @@ for Re in Reynolds:
     print('Initializing...')
     Equilibrium.prepared_call(grid, block, rho_d, u_d, feq_d)
     cuda.memcpy_dtod_async(f_d, feq_d, sizef)
-    
     cuda.memcpy_dtoh_async(f, f_d)
-    cuda.memcpy_dtoh_async(feq, feq_d)
     
     #***** Main Loop *****
     step = 0
@@ -212,6 +230,18 @@ for Re in Reynolds:
         Collision.prepared_call(grid, block, fout_d, feq_d, fneq_d)
         
         #***** Propagation Step *****
+        Propagation.prepared_call(grid, block, f_d, fout_d)
+        
+        #***** Boundary Conditions *****
+        # Bounce-back
+        BounceBack.prepared_call(grid, block, fluid_wall_d, cylinder_d, f_d, fout_d)
+        
+        # Zou e He
+        ZouHeIn.prepared_call(grid, block, uini, rho_d, u_d, f_d)
+        ZouHeOut.prepared_call(grid, block, Nx, rho_d, u_d, f_d)
+        
+        # Periódicas
+        
         
 
         
@@ -223,8 +253,9 @@ for Re in Reynolds:
         cuda.memcpy_dtoh_async(fout, fout_d)
         cuda.memcpy_dtoh_async(tauab, tauab_d)
         
-        print()
-
+        if(step == maxiter):
+            break
+        step += 1
 
 
 
