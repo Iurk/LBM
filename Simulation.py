@@ -5,7 +5,7 @@ Created on Thu May  7 16:54:48 2020
 
 @author: iurk
 """
-from numpy import float32, ones, zeros
+from numpy import int32, float32, ones, zeros
 class Simulation():
         
     def __init__(self, Nx, Ny, Cx, Cy, D, uini):
@@ -22,22 +22,22 @@ class Simulation():
         return self.rho, self.u
     
     def solid_create(self):
-        self.solid = zeros((self.nx, self.ny), dtype=bool)
+        self.solid = zeros((self.ny, self.nx), dtype=int32)
         for y in range(self.ny):
             for x in range(self.nx):
                 if (x - self.cx)**2 + (y - self.cy)**2 <= (self.d/2)**2:
-                    self.solid[x, y] = True
+                    self.solid[y, x] = 1
                     
     def get_solid(self):
         return self.solid
     
     def __init_u(self):
-        u = zeros((2, self.nx, self.ny), dtype=float32)
+        u = zeros((2, self.ny, self.nx), dtype=float32)
         u[0, :, :] = self.uini
         return u
     
     def __init_rho(self):
-        rho = ones((self.nx, self.ny), dtype=float32)
+        rho = ones((self.ny, self.nx), dtype=float32)
         return rho
     
     def relaxation_term(self, cs, Re):
