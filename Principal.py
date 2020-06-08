@@ -21,12 +21,12 @@ def pressao(rho, cs):
 #***** Entrada de Dados *****
 L = 1       # Comprimento do túnel [m]
 H = 2.5     # Altura do túnel [m]
-Nx = 900    # Número de partículas em x [Lattice units]
-Ny = 300    # Número de partículas em y [Lattice units]
+Nx = 256    # Número de partículas em x [Lattice units]
+Ny = 128    # Número de partículas em y [Lattice units]
 
 Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = 80    # Diâmetro do Cilindro [Lattice units]
+D_est = 128    # Diâmetro do Cilindro [Lattice units]
 
 Reynolds = [300]    # Reynolds Numbers
 cl_Re = []
