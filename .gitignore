@@ -1,3 +1,13 @@
-__pycache__/
-Re = */
-Coeficientes.txt
+#Folders
+__pycache__
+Results/
+Velocity/
+obj/
+
+# Executables
+lbm
+sim
+
+# Output files
+*.gif
+*.log
