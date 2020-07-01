@@ -1,21 +1,26 @@
 domain:
-  Nx: 512
-  Ny: 512
+  Nx: 32
+  Ny: 16
+
+cylinder:
+  Cx: Nx/4
+  Cy: Ny/2
+  D: 4
 
 simulation:
   lattice: D2Q9
   NSTEPS: 5000
   NSAVE: 50
   NMSG: 50
-  computeFlowProperties: true
+  computeFlowProperties: false
   quiet: true
 
 gpu:
   nThreads: 32
 
 input:
-  Re: 7.68
-  u_max: 0.1
+  Re: 10
+  u_max: 0.04
   rho0: 1.0
 
 air:
