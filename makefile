@@ -1,6 +1,7 @@
 # MakeFile
 
 # Python Scripts
+PYMESH = mesh.py
 PYDADOS = data_process.py
 
 # Program Name
@@ -8,16 +9,16 @@ EXE = lbm
 
 # Compilers
 NVCC := nvcc
-LINKER := g++
 
 LIBRARY := yaml-cpp
+LIBDIR := /usr/local/lib
 
 # GPU
 ARCH = sm_61
 
 # Directories
 SRCDIR := src
-INCDIR := inc
+INCDIR := inc /usr/local/include
 OBJDIR := obj
 BINDIR := bin
 VELOCITY := Velocity
@@ -39,19 +40,22 @@ CPP_DEP := $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.d, $(CPP_FILES))
 OBJ_COMP := $(CU_OBJ) $(CPP_OBJ)
 DEP_COMP := $(CU_DEP) $(CPP_DEP)
 
-OBJ := $(C_OBJ) $(CU_OBJ) $(CPP_OBJ)
-DEP := $(C_DEP) $(CU_DEP) $(CPP_DEP)
+OBJ := $(C_OBJ) $(CPP_OBJ) $(CU_OBJ)
+DEP := $(C_DEP) $(CPP_DEP) $(CU_DEP)
 
 # Flags
-INCDIRS := $(addprefix -I, $(INCDIR))
+INCDIRS = $(addprefix -I, $(INCDIR))
+LIBDIRS = $(addprefix -L, $(LIBDIR))
+LIB := $(addprefix -l, $(LIBRARY))
 CXXFLAGS := -std=c++11
 NVCCARCHFLAG :=-arch $(ARCH)
-NVCCFLAGS := -v --ptxas-options=-v -O3
+NVCCFLAGS := -v --ptxas-options=-v -O3 --device-c # Para debug flag -g -G e executar com cuda-memcheck ./lbm |more
+DEPFLAGS := -MMD
 
-INCYAML := $(pkg-config --cflags yaml-cpp)
-LBPATH := $(pkg-config --libs yaml-cpp)
+COMPILE.c = $(NVCC) $(DEPFLAGS) -g $(INCDIRS) -c
+COMPILE.cpp = $(NVCC) $(DEPFLAGS) $(CXXFLAGS) $(INCDIRS) $(NVCCARCHFLAG) $(NVCCFLAGS)
 
-LIB := $(addprefix -l, $(LIBRARY))
+$(info $(OBJ))
 
 .PHONY: all clean run
 
@@ -59,29 +63,17 @@ all: $(EXE)
 
 # Linkage
 $(EXE): $(OBJ)
-	$(NVCC) $(NVCCARCHFLAG) $(CXXFLAGS) $^ -o $@ $(LIB)
+	$(NVCC) $(NVCCARCHFLAG) $(CXXFLAGS) $(LIBDIRS) $^ -o $@ $(LIB)
 
-# Generating Object files from .c
 $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
-	$(NVCC) -g $(INCDIRS) -c $< -o $@
+	$(COMPILE.c) $< -o $@
 
-# Generating Object files from .cu and .cpp
-$(CU_OBJ): $(OBJDIR)/%.o: $(SRCDIR)/%.cu
-$(CPP_OBJ): $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
-$(OBJ_COMP): | $(OBJDIR)
-	$(NVCC) $(NVCCARCHFLAG) $(NVCCFLAGS) $(INCDIRS) --device-c $< -o $@ # Para debug flag -g -G e executar com cuda-memcheck ./lbm |more
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
+	$(COMPILE.cpp) $< -o $@
 
-# Generating Dependency files from .c
-$(OBJDIR)/%.d: $(SRCDIR)/%.c | $(OBJDIR)
-	$(NVCC) $(INCDIRS) -MM $< | sed -e 's%^%$@ %' -e 's% % $(OBJDIR)/%'\ > $@
+$(OBJDIR)/%.o: $(SRCDIR)/%.cu | $(OBJDIR)
+	$(COMPILE.cpp) $< -o $@
 
-# Generating Dependency files from .cu and .cpp
-$(CU_OBJ): $(OBJDIR)/%.d: $(SRCDIR)/%.cu
-$(CPP_OBJ): $(OBJDIR)/%.d: $(SRCDIR)/%.cpp
-$(DEP_COMP): | $(OBJDIR)
-	$(NVCC) $(INCDIRS) -MM $< | sed -e 's%^%$@ %' -e 's% % $(OBJDIR)/%'\ > $@
-
-# Creating folder
 $(OBJDIR):
 	@mkdir -p $@
 
@@ -89,6 +81,7 @@ $(OBJDIR):
 clean:
 	@echo Cleaning up...
 	@rm -f -r $(OBJDIR)
+	@rm -f -r $(DEPDIR)
 	@rm -f $(EXE)
 	@rm -f -r $(VELOCITY)/*
 	@rm -f -r $(RESULTS)/*
