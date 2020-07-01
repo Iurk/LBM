@@ -4,17 +4,23 @@
 
 #include <cuda.h>
 
+#include "paths.h"
 #include "LBM.h"
 #include "dados.h"
 
 using namespace myGlobals;
 
+// Input data
 __constant__ unsigned int q, Nx_d, Ny_d;
 __constant__ double rho0_d, u_max_d, nu_d, tau_d;
 
+//Lattice Data
 __constant__ double cs_d, w0_d, ws_d, wd_d;
 __device__ int *ex_d;
 __device__ int *ey_d;
+
+// Mesh data
+__device__ bool *mesh_d;
 
 __device__ __forceinline__ size_t gpu_field0_index(unsigned int x, unsigned int y){
 	return Nx_d*y + x;
@@ -28,47 +34,13 @@ __device__ __forceinline__ size_t gpu_fieldn_index(unsigned int x, unsigned int 
 	return (Nx_d*(Ny_d*(d - 1) + y) + x);
 }
 
-__global__ void gpu_taylor_green(unsigned int, double*, double*, double*);
 __global__ void gpu_init_equilibrium(double*, double*, double*, double*, double*);
 __global__ void gpu_stream_collide_save(double *, double *, double*, double*, double*, double*, double*, double*, bool);
 __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, double*, double*);
 __global__ void gpu_init_device_var(int *, int *);
-
-__device__ void taylor_green_eval(unsigned int t, unsigned int x, unsigned int y, double *r, double *u, double *v){
-	
-	double kx = 2.0*M_PI/Nx_d;
-	double ky = 2.0*M_PI/Ny_d;
-	double td = 1.0/(nu_d*(kx*kx + ky*ky));
-
-	double X = x + 0.5;
-	double Y = y + 0.5;
-	double ux = -u_max_d*sqrt(ky/kx)*cos(kx*X)*sin(ky*Y)*exp(-1.0*t/td);
-	double uy =  u_max_d*sqrt(kx/ky)*sin(kx*X)*cos(ky*Y)*exp(-1.0*t/td);
-	double P = -0.25*rho0_d*u_max_d*u_max_d*((ky/kx)*cos(2.0*kx*X) + (kx/ky)*cos(2.0*ky*Y))*exp(-2.0*t/td);
-	double rho = rho0_d + 3.0*P;
-
-	*r = rho;
-	*u = ux;
-	*v = uy;
-}
-
-__host__ void taylor_green(unsigned int t, double *r, double *u, double *v){
-
-	dim3 grid(Nx/nThreads, Ny, 1);
-	dim3 block(nThreads, 1, 1);
-
-	gpu_taylor_green<<< grid, block >>>(t, r, u, v);
-	getLastCudaError("gpu_taylor_green kernel error");
-}
-
-__global__ void gpu_taylor_green(unsigned int t, double *r, double *u, double *v){
-
-	unsigned int y = blockIdx.y;
-	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
-
-	size_t sidx = gpu_scalar_index(x, y);
-	taylor_green_eval(t, x, y, &r[sidx], &u[sidx], &v[sidx]);
-}
+__global__ void gpu_init_mesh(bool *);
+__global__ void gpu_generate_mesh(bool *);
+__global__ void gpu_print_mesh();
 
 __host__ void init_equilibrium(double *f0, double *f1, double *r, double *u, double *v){
 
@@ -201,7 +173,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		f2[gpu_fieldn_index(x, y, n)] = omega*f1neq[gpu_fieldn_index(x, y, n)] + tWrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
 	}
 }
-
+/*
 __host__ void compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop, double *prop_gpu, double *prop_host){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
@@ -263,7 +235,7 @@ __global__ void gpu_compute_flow_properties(unsigned int t, double *r, double *u
 	E[threadIdx.x] = rho*(ux*ux + uy*uy);
 
 	double rhoa, uxa, uya;
-	taylor_green_eval(t, x, y, &rhoa, &uxa, &uya);
+	//taylor_green_eval(t, x, y, &rhoa, &uxa, &uya);
 
 	rhoe2[threadIdx.x] = (rho - rhoa)*(rho - rhoa);
 	uxe2[threadIdx.x] = (ux - uxa)*(ux - uxa);
@@ -303,7 +275,7 @@ __host__ void report_flow_properties(unsigned int t, double *rho, double *ux, do
 	compute_flow_properties(t, rho, ux, uy, prop, prop_gpu, prop_host);
 	printf("%u, %g, %g, %g, %g\n", t, prop[0], prop[1], prop[2], prop[3]);
 }
-
+*/
 __host__ void save_scalar(const char* name, double *scalar_gpu, double *scalar_host, unsigned int n){
 
 	char filename[128];
@@ -374,4 +346,48 @@ __global__ void gpu_init_device_var(int *temp_ex_d, int *temp_ey_d){
 	ex_d = temp_ex_d;
 	__syncthreads();
 	ey_d = temp_ey_d;
+}
+
+__host__ void generate_mesh(bool *mesh){
+
+	dim3 grid(Nx/nThreads, Ny, 1);
+	dim3 block(nThreads, 1, 1);
+
+	bool *temp_mesh;
+
+	checkCudaErrors(cudaMalloc((void**)&temp_mesh, mem_mesh));
+	checkCudaErrors(cudaMemset(temp_mesh, 0, mem_mesh));
+
+	gpu_init_mesh<<< 1, 1 >>>(temp_mesh);
+	getLastCudaError("gpu_init_mesh kernel error");
+
+	checkCudaErrors(cudaMemcpy(temp_mesh, mesh, mem_mesh, cudaMemcpyHostToDevice));
+
+	gpu_generate_mesh<<< grid, block >>>(temp_mesh);
+	getLastCudaError("gpu_generate_mesh kernel error");
+
+	gpu_print_mesh<<< 1, 1 >>>();
+
+}
+
+__global__ void gpu_init_mesh(bool *init_mesh){
+	mesh_d = init_mesh;
+}
+
+__global__ void gpu_generate_mesh(bool *mesh_h){
+
+	unsigned int y = blockIdx.y;
+	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+
+	mesh_d[Nx_d*y + x] = mesh_h[Nx_d*y + x];
+	__syncthreads();
+}
+
+__global__ void gpu_print_mesh(){
+	for(int y = 0; y < Ny_d; ++y){
+		for(int x = 0; x < Nx_d; ++x){
+			printf("%d ", mesh_d[Nx_d*y + x]);
+		}
+		printf("\n");
+	}
 }
