@@ -27,9 +27,12 @@ namespace myGlobals{
 	extern double cs, w0, ws, wd;
 
 	//Memory Sizes
+	extern const size_t mem_mesh;
 	extern const size_t mem_size_0dir;
 	extern const size_t mem_size_n0dir;
 	extern const size_t mem_size_scalar;
+
+	extern bool *mesh;
 }
 
 #endif

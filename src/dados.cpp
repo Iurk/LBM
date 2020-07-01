@@ -55,6 +55,7 @@ namespace myGlobals{
 	double wd = equation_parser(wd_str);
 
 	//Memory Sizes
+	const size_t mem_mesh = sizeof(bool)*Nx*Ny;
 	const size_t mem_size_0dir = sizeof(double)*Nx*Ny;
 	const size_t mem_size_n0dir = sizeof(double)*Nx*Ny*(ndir - 1);
 	const size_t mem_size_scalar = sizeof(double)*Nx*Ny;
@@ -62,4 +63,6 @@ namespace myGlobals{
 	// Nu and Tau
 	double nu = 1.0/6.0;//(u_max*Nx)/Re;
 	const double tau = nu/(cs*cs) + 0.5;
+
+	bool *mesh = read_bin();
 }
