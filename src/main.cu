@@ -9,6 +9,7 @@ using namespace myGlobals;
 
 int main(int argc, char const *argv[]){
 
+	// Writing Simulation Parameters
 	printf("Simulating Taylor-Green vortex decay\n");
 	printf("  Domain size: %ux%u\n", Nx, Ny);
 	printf("           nu: %g\n", nu);
@@ -23,6 +24,7 @@ int main(int argc, char const *argv[]){
 	double bytesPerMiB = 1024.0*1024.0;
 	double bytesPerGiB = 1024.0*1024.0*1024.0;
 
+	// Getting Device Info and Writing then
 	checkCudaErrors(cudaSetDevice(0));
 	int deviceId = 0;
 	checkCudaErrors(cudaGetDevice(&deviceId));
@@ -42,6 +44,7 @@ int main(int argc, char const *argv[]){
 	printf("       Free Memory: %.1f MiB\n", gpu_free_mem/bytesPerMiB);
 	printf("\n");
 
+	// Declaration and Allocation in device Memory
 	double *f0_gpu, *f1_gpu, *f2_gpu;
 	double *f0neq_gpu, *f1neq_gpu;
 	double *rho_gpu, *ux_gpu, *uy_gpu;
@@ -67,11 +70,12 @@ int main(int argc, char const *argv[]){
 
 	size_t total_mem_bytes = mem_size_0dir + 2*mem_size_n0dir + 3*mem_size_scalar + mem_size_props;
 	
+	// Creating Events for time measure
 	cudaEvent_t start, stop;
 	checkCudaErrors(cudaEventCreate(&start));
 	checkCudaErrors(cudaEventCreate(&stop));
 
-	// Input poiters
+	// Declaration and Allocation of Input data in Device constant memory
 	unsigned int *ptrNx, *ptrNy;
 	double *ptrrho0, *ptru_max;
 	double *ptrNu;
@@ -83,7 +87,7 @@ int main(int argc, char const *argv[]){
 
 	wrapper_input(ptrNx, ptrNy, ptrrho0, ptru_max, ptrNu, ptrTau);
 
-	// Lattice poiters
+	// Declaration and Allocation of Lattice data in Device constant and global memory
 	unsigned int *ptrNdir;
 	double *ptrcs, *ptrW0, *ptrWs, *ptrWd;
 
@@ -94,7 +98,11 @@ int main(int argc, char const *argv[]){
 
 	init_device_var();
 
-	taylor_green(0, rho_gpu, ux_gpu, uy_gpu);
+	// Generating Mesh
+	generate_mesh(mesh);
+
+	// Initialization
+	//taylor_green(0, rho_gpu, ux_gpu, uy_gpu);
 	
 	init_equilibrium(f0_gpu, f1_gpu, rho_gpu, ux_gpu, uy_gpu);
 	checkCudaErrors(cudaMemset(f0neq_gpu, 0, mem_size_0dir));
@@ -104,13 +112,12 @@ int main(int argc, char const *argv[]){
 	save_scalar("ux", ux_gpu, scalar_host, 0);
 	save_scalar("uy", uy_gpu, scalar_host, 0);
 
-	if(computeFlowProperties){
-		report_flow_properties(0, rho_gpu, ux_gpu, uy_gpu, prop_gpu, scalar_host);
-	}
 	
+	// Simulation Start
 	double begin = seconds();
 	checkCudaErrors(cudaEventRecord(start, 0));
 
+	// Main Loop
 	for(unsigned int n = 0; n < NSTEPS; ++n){
 		bool save = (n+1)%NSAVE == 0;
 		bool msg = (n+1)%NMSG == 0;
@@ -130,7 +137,7 @@ int main(int argc, char const *argv[]){
 
 		if(msg){
 			if(computeFlowProperties){
-				report_flow_properties(n+1, rho_gpu, ux_gpu, uy_gpu, prop_gpu, scalar_host);
+				//report_flow_properties(n+1, rho_gpu, ux_gpu, uy_gpu, prop_gpu, scalar_host);
 			}
 
 			if(!quiet){
@@ -139,6 +146,7 @@ int main(int argc, char const *argv[]){
 		}
 	}
 
+	// Measuring time
 	checkCudaErrors(cudaEventRecord(stop, 0));
 	checkCudaErrors(cudaEventSynchronize(stop));
 	float miliseconds = 0.0f;
@@ -158,6 +166,7 @@ int main(int argc, char const *argv[]){
 
 	double bandwidth = (nodes_updated*(doubles_read + doubles_wirtten) + nodes_saved*(doubles_saved))*sizeof(double)/(runtime*bytesPerGiB);
 
+	// Writing the performance
 	printf("Performance Information\n");
 	printf(" Memory Allocated (GPU): %.1f (MiB)\n", total_mem_bytes/bytesPerMiB);
 	printf("Memory Allocated (host): %.1f (MiB)\n", mem_size_scalar/bytesPerMiB);
@@ -167,9 +176,11 @@ int main(int argc, char const *argv[]){
 	printf("                  Speed: %.2f (Mlups)\n", speed);
 	printf("               Bandwith: %.1f (GiB/s)\n", bandwidth);
 
+	// Destroying Events
 	checkCudaErrors(cudaEventDestroy(start));
 	checkCudaErrors(cudaEventDestroy(stop));
 
+	// Freeing Device and CPU Memory
 	checkCudaErrors(cudaFree(f0_gpu));
 	checkCudaErrors(cudaFree(f1_gpu));
 	checkCudaErrors(cudaFree(f2_gpu));
