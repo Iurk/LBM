@@ -3,6 +3,7 @@ __pycache__
 Results/
 Velocity/
 obj/
+bin/*.bin
 
 # Executables
 lbm
