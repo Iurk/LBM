@@ -20,7 +20,8 @@ __device__ int *ex_d;
 __device__ int *ey_d;
 
 // Mesh data
-__device__ bool *mesh_d;
+__device__ bool *cylinder_d;
+__device__ bool *fluid_d;
 
 __device__ __forceinline__ size_t gpu_field0_index(unsigned int x, unsigned int y){
 	return Nx_d*y + x;
@@ -38,9 +39,9 @@ __global__ void gpu_init_equilibrium(double*, double*, double*, double*, double*
 __global__ void gpu_stream_collide_save(double *, double *, double*, double*, double*, double*, double*, double*, bool);
 __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, double*, double*);
 __global__ void gpu_init_device_var(int *, int *);
-__global__ void gpu_init_mesh(bool *);
-__global__ void gpu_generate_mesh(bool *);
-__global__ void gpu_print_mesh();
+__global__ void gpu_init_mesh(bool *, int);
+__global__ void gpu_generate_mesh(bool *, int);
+//__global__ void gpu_print_mesh(int);
 
 __host__ void init_equilibrium(double *f0, double *f1, double *r, double *u, double *v){
 
@@ -141,12 +142,12 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	double wdr = wd_d*rho;
 
 	double tw0r = tauinv*w0_d*rho; 
-    double twsr = tauinv*ws_d*rho; 
-    double twdr = tauinv*wd_d*rho; 
+	double twsr = tauinv*ws_d*rho; 
+	double twdr = tauinv*wd_d*rho; 
 
-    double W[] = {w0_d, ws_d, ws_d, ws_d, ws_d, wd_d, wd_d, wd_d, wd_d};
-    double Wrho[] = {w0r, wsr, wsr, wsr, wsr, wdr, wdr, wdr, wdr};
-    double tWrho[] = {tw0r, twsr, twsr, twsr, twsr, twdr, twdr, twdr, twdr};
+	double W[] = {w0_d, ws_d, ws_d, ws_d, ws_d, wd_d, wd_d, wd_d, wd_d};
+	double Wrho[] = {w0r, wsr, wsr, wsr, wsr, wdr, wdr, wdr, wdr};
+	double tWrho[] = {tw0r, twsr, twsr, twsr, twsr, twdr, twdr, twdr, twdr};
 
 	double omusq = 1.0 - B*(ux*ux + uy*uy);
 
@@ -172,6 +173,75 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		double eidotu = ux*ex_d[n] + uy*ey_d[n];
 		f2[gpu_fieldn_index(x, y, n)] = omega*f1neq[gpu_fieldn_index(x, y, n)] + tWrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
 	}
+
+	int sidx = gpu_scalar_index(x, y);
+
+	if(x == 0){
+
+		gpu_zou_he_inlet(x, y, u_max_d, &f0, &f2, &r[sidx], &u[sidx], &v[sidx]);
+
+	}
+	else if(x == Nx_d){
+
+		gpu_zou_he_outlet(x, y, &f0, &f2, &r[sidx], &u[sidx], &v[sidx]);
+
+	}
+}
+
+// Boundary Conditions
+__device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double u_ini, double *f0, double *f2, double *r, double *u, double *v){
+
+	double ux = u_ini;
+	double uy = 0;
+
+	int 0idx = gpu_field0_index(x, y);
+	int 1idx = gpu_fieldn_index(x, y, 1);
+	int 2idx = gpu_fieldn_index(x, y, 2);
+	int 3idx = gpu_fieldn_index(x, y, 3);
+	int 4idx = gpu_fieldn_index(x, y, 4);
+	int 5idx = gpu_fieldn_index(x, y, 5);
+	int 6idx = gpu_fieldn_index(x, y, 6);
+	int 7idx = gpu_fieldn_index(x, y, 7);
+	int 8idx = gpu_fieldn_index(x, y, 8);
+
+
+	double rho = (f0[0] + f2[2idx] + f2[4idx] + 2*(f2[3idx] + f2[6idx] + f2[7idx]))/(1.0 - ux);
+	*f2[1idx] = f2[3idx] + 2.0/3.0*rho*ux;
+	*f2[5idx] = f2[7idx] - 0.5*(f2[2idx] - f2[4idx]) + 1.0/6.0*rho*ux;
+	*f2[8idx] = f2[6idx] + 0.5*(f2[2idx] - f2[4idx]) + 1.0/6.0*rho*ux;
+
+	*r = rho;
+	*u = ux;
+	*v = uy;
+}
+
+__device__ void gpu_zou_he_outlet(unsigned int x, unsigned int y, double *f0, double *f2, double *r, double *u, double *v){
+
+	rho = 1.0;
+	uy = 0.0;
+
+	int 0idx = gpu_field0_index(x, y);
+	int 1idx = gpu_fieldn_index(x, y, 1);
+	int 2idx = gpu_fieldn_index(x, y, 2);
+	int 3idx = gpu_fieldn_index(x, y, 3);
+	int 4idx = gpu_fieldn_index(x, y, 4);
+	int 5idx = gpu_fieldn_index(x, y, 5);
+	int 6idx = gpu_fieldn_index(x, y, 6);
+	int 7idx = gpu_fieldn_index(x, y, 7);
+	int 8idx = gpu_fieldn_index(x, y, 8);
+
+	ux = (f0[0] + f2[2idx] + f2[4idx] + 2*(f2[1idx] + f2[5idx] + f2[8idx]))/rho - 1.0;
+	*f2[3idx] = f2[1idx] - 2.0/3.0*rho*ux;
+	*f2[6idx] = f2[8idx] - 0.5*(f2[2idx] - f2[4idx]) - 1.0/6.0*rho*ux;
+	*f2[7idx] = f2[5idx] + 0.5*(f2[2idx] - f2[4idx]) - 1.0/6.0*rho*ux;
+
+	*r = rho;
+	*u = ux;
+	*v = uy;
+}
+
+__device__ noslip(){
+	
 }
 /*
 __host__ void compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop, double *prop_gpu, double *prop_host){
@@ -348,7 +418,9 @@ __global__ void gpu_init_device_var(int *temp_ex_d, int *temp_ey_d){
 	ey_d = temp_ey_d;
 }
 
-__host__ void generate_mesh(bool *mesh){
+__host__ void generate_mesh(bool *mesh, std::string mode){
+
+	int mode_num;
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
@@ -358,36 +430,71 @@ __host__ void generate_mesh(bool *mesh){
 	checkCudaErrors(cudaMalloc((void**)&temp_mesh, mem_mesh));
 	checkCudaErrors(cudaMemset(temp_mesh, 0, mem_mesh));
 
-	gpu_init_mesh<<< 1, 1 >>>(temp_mesh);
+	if(mode == "solid"){
+		mode_num = 1;
+	}
+	else if(mode == "fluid"){
+		mode_num = 2;
+	}
+
+	gpu_init_mesh<<< 1, 1 >>>(temp_mesh, mode_num);
 	getLastCudaError("gpu_init_mesh kernel error");
 
 	checkCudaErrors(cudaMemcpy(temp_mesh, mesh, mem_mesh, cudaMemcpyHostToDevice));
 
-	gpu_generate_mesh<<< grid, block >>>(temp_mesh);
+	gpu_generate_mesh<<< grid, block >>>(temp_mesh, mode_num);
 	getLastCudaError("gpu_generate_mesh kernel error");
 
-	gpu_print_mesh<<< 1, 1 >>>();
+	//gpu_print_mesh<<< 1, 1 >>>(mode_num);
+	//printf("\n");
+
+	checkCudaErrors(cudaFree(temp_mesh));
 
 }
 
-__global__ void gpu_init_mesh(bool *init_mesh){
-	mesh_d = init_mesh;
+__global__ void gpu_init_mesh(bool *init_mesh, int mode){
+	if(mode == 1){
+		cylinder_d = init_mesh;
+	}
+	else if(mode == 2){
+		fluid_d = init_mesh;
+	}
 }
 
-__global__ void gpu_generate_mesh(bool *mesh_h){
+__global__ void gpu_generate_mesh(bool *mesh_h, int mode){
 
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 
-	mesh_d[Nx_d*y + x] = mesh_h[Nx_d*y + x];
-	__syncthreads();
-}
-
-__global__ void gpu_print_mesh(){
-	for(int y = 0; y < Ny_d; ++y){
-		for(int x = 0; x < Nx_d; ++x){
-			printf("%d ", mesh_d[Nx_d*y + x]);
-		}
-		printf("\n");
+	if(mode == 1){
+		cylinder_d[Nx_d*y + x] = mesh_h[Nx_d*y + x];
+		__syncthreads();
 	}
+	else if(mode == 2){
+		fluid_d[Nx_d*y + x] = mesh_h[Nx_d*y + x];
+		__syncthreads();
+	}
+
+	
 }
+/*
+__global__ void gpu_print_mesh(int mode){
+	if(mode == 1){
+		for(int y = 0; y < Ny_d; ++y){
+			for(int x = 0; x < Nx_d; ++x){
+				printf("%d ", cylinder_d[Nx_d*y + x]);
+			}
+		printf("\n");
+		}
+	}
+	else if(mode == 2){
+		for(int y = 0; y < Ny_d; ++y){
+			for(int x = 0; x < Nx_d; ++x){
+				printf("%d ", fluid_d[Nx_d*y + x]);
+			}
+		printf("\n");
+		}
+	}
+	
+}
+*/
