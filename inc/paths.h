@@ -2,6 +2,7 @@
 #define __PATH_H
 
 const char folder[] = "./Results/";
-const char mesh_path[] = "./bin/mesh.bin";
+const char solid_mesh[] = "./bin/Mesh/mesh.bin";
+const char fluid_mesh[] = "./bin/Mesh/fluid_wall.bin";
 
 #endif
