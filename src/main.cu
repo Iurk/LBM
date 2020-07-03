@@ -99,7 +99,8 @@ int main(int argc, char const *argv[]){
 	init_device_var();
 
 	// Generating Mesh
-	generate_mesh(mesh);
+	generate_mesh(cylinder, "solid");
+	generate_mesh(fluid, "fluid");
 
 	// Initialization
 	//taylor_green(0, rho_gpu, ux_gpu, uy_gpu);
