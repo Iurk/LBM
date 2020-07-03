@@ -1,5 +1,6 @@
 #ifndef __LBM_H
 #define __LBM_H
+#include <iostream>
 #include <vector>
 
 void init_equilibrium(double *, double *, double *, double *, double *);
@@ -10,7 +11,7 @@ void save_scalar(const char* , double *, double *, unsigned int);
 void wrapper_input(unsigned int *, unsigned int *, double *, double *, double *, const double *);
 void wrapper_lattice(unsigned int *, double *, double *, double *, double *);
 void init_device_var();
-void generate_mesh(bool *);
+void generate_mesh(bool *, std::string);
 
 #define checkCudaErrors(err) __checkCudaErrors(err, #err, __FILE__, __LINE__)
 #define getLastCudaError(msg) __getLastCudaError(msg, __FILE__, __LINE__)
