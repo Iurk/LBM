@@ -1,8 +1,8 @@
 # MakeFile
 
 # Python Scripts
-PYMESH = mesh.py
-PYDADOS = data_process.py
+PYMESH = Python/mesh.py
+PYDADOS = Python/data_process.py
 
 # Program Name
 EXE = lbm
@@ -55,8 +55,6 @@ DEPFLAGS := -MMD
 COMPILE.c = $(NVCC) $(DEPFLAGS) -g $(INCDIRS) -c
 COMPILE.cpp = $(NVCC) $(DEPFLAGS) $(CXXFLAGS) $(INCDIRS) $(NVCCARCHFLAG) $(NVCCFLAGS)
 
-$(info $(OBJ))
-
 .PHONY: all clean run
 
 all: $(EXE)
@@ -90,6 +88,9 @@ clean:
 
 # Running
 run:
+	@exho Generating mesh...
+	@python $(PYMESH)
+	
 	@echo Running simulation...
 	@./$(EXE)
 
