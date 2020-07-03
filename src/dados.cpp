@@ -3,6 +3,7 @@
 
 #include "utilidades.h"
 #include "dados.h"
+#include "paths.h"
 
 // Opening yaml file
 YAML::Node config = YAML::LoadFile("./bin/dados.yml");
@@ -64,5 +65,6 @@ namespace myGlobals{
 	double nu = 1.0/6.0;//(u_max*Nx)/Re;
 	const double tau = nu/(cs*cs) + 0.5;
 
-	bool *mesh = read_bin();
+	bool *cylinder = read_bin(solid_mesh);
+	bool *fluid = read_bin(fluid_mesh);
 }

@@ -32,7 +32,8 @@ namespace myGlobals{
 	extern const size_t mem_size_n0dir;
 	extern const size_t mem_size_scalar;
 
-	extern bool *mesh;
+	extern bool *cylinder;
+	extern bool *fluid;
 }
 
 #endif
