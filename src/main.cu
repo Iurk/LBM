@@ -59,7 +59,7 @@ int main(int argc, char const *argv[]){
 	checkCudaErrors(cudaMalloc((void**)&ux_gpu, mem_size_scalar));
 	checkCudaErrors(cudaMalloc((void**)&uy_gpu, mem_size_scalar));
 
-	const size_t mem_size_props = 7*Nx/nThreads*Ny*sizeof(double);
+	const size_t mem_size_props = Nx/nThreads*Ny*sizeof(double);
 	checkCudaErrors(cudaMalloc((void**)&prop_gpu, mem_size_props));
 
 	double *scalar_host = (double*) malloc(mem_size_scalar);
@@ -103,8 +103,8 @@ int main(int argc, char const *argv[]){
 	generate_mesh(fluid, "fluid");
 
 	// Initialization
-	//taylor_green(0, rho_gpu, ux_gpu, uy_gpu);
-	
+	initialization(rho_gpu, ux_gpu, uy_gpu);
+
 	init_equilibrium(f0_gpu, f1_gpu, rho_gpu, ux_gpu, uy_gpu);
 	checkCudaErrors(cudaMemset(f0neq_gpu, 0, mem_size_0dir));
 	checkCudaErrors(cudaMemset(f1neq_gpu, 0, mem_size_n0dir));
@@ -138,7 +138,7 @@ int main(int argc, char const *argv[]){
 
 		if(msg){
 			if(computeFlowProperties){
-				//report_flow_properties(n+1, rho_gpu, ux_gpu, uy_gpu, prop_gpu, scalar_host);
+				report_flow_properties(n+1, rho_gpu, ux_gpu, uy_gpu, prop_gpu, scalar_host);
 			}
 
 			if(!quiet){
