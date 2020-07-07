@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 
+void initialization(double *, double *, double *);
 void init_equilibrium(double *, double *, double *, double *, double *);
 void stream_collide_save(double *, double *, double *, double *, double *, double *, double *, double *, bool);
 void compute_flow_properties(unsigned int, double *, double *, double *, double *, double *, double *);
