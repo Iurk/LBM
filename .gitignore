@@ -3,7 +3,7 @@ __pycache__
 Results/
 Velocity/
 obj/
-bin/*.bin
+bin/Mesh/*.bin
 
 # Executables
 lbm
@@ -12,3 +12,5 @@ sim
 # Output files
 *.gif
 *.log
+
+
