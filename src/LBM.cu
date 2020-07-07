@@ -41,7 +41,90 @@ __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, doub
 __global__ void gpu_init_device_var(int *, int *);
 __global__ void gpu_init_mesh(bool *, int);
 __global__ void gpu_generate_mesh(bool *, int);
-//__global__ void gpu_print_mesh(int);
+__global__ void gpu_print_mesh(int);
+__global__ void gpu_initialization(const double, double *);
+
+// Boundary Conditions
+__device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double u_ini, double *f0, double *f2, double *f1,
+								double *f5, double *f8, double *r, double *u, double *v){
+
+	double ux = u_ini;
+	double uy = 0;
+
+	unsigned int idx_0 = gpu_field0_index(x, y);
+	unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
+	unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
+	unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
+	unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
+	unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
+
+	double rho = (f0[idx_0] + f2[idx_2] + f2[idx_4] + 2*(f2[idx_3] + f2[idx_6] + f2[idx_7]))/(1.0 - ux);
+	*f1 = f2[idx_3] + 2.0/3.0*rho*ux;
+	*f5 = f2[idx_7] - 0.5*(f2[idx_2] - f2[idx_4]) + 1.0/6.0*rho*ux;
+	*f8 = f2[idx_6] + 0.5*(f2[idx_2] - f2[idx_4]) + 1.0/6.0*rho*ux;
+
+	*r = rho;
+	*u = ux;
+	*v = uy;
+}
+
+__device__ void gpu_zou_he_outlet(unsigned int x, unsigned int y, double *f0, double *f2, double *f3,
+								double *f6, double *f7, double *r, double *u, double *v){
+
+	double rho = 1.0;
+	double uy = 0.0;
+
+	unsigned int idx_0 = gpu_field0_index(x, y);
+	unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
+	unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
+	unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
+	unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
+	unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
+
+	double ux = (f0[idx_0] + f2[idx_2] + f2[idx_4] + 2*(f2[idx_1] + f2[idx_5] + f2[idx_8]))/rho - 1.0;
+	*f3 = f2[idx_1] - 2.0/3.0*rho*ux;
+	*f6 = f2[idx_8] - 0.5*(f2[idx_2] - f2[idx_4]) - 1.0/6.0*rho*ux;
+	*f7 = f2[idx_5] + 0.5*(f2[idx_2] - f2[idx_4]) - 1.0/6.0*rho*ux;
+
+	*r = rho;
+	*u = ux;
+	*v = uy;
+}
+
+__device__ void gpu_noslip(unsigned int x, unsigned int y, double *f2){
+
+	unsigned int noslip[] = {0, 3, 4, 1, 2, 7, 8, 5, 6};
+
+	for(int n = 1; n < q; ++n){
+		unsigned int noslip_n = noslip[n];
+		f2[gpu_fieldn_index(x, y, n)] = f2[gpu_fieldn_index(x, y, noslip_n)];
+	}
+	
+}
+
+__device__ void gpu_bounce_back(unsigned int x, unsigned int y, double *f2){
+	unsigned int noslip[] = {0, 3, 4, 1, 2, 7, 8, 5, 6};
+
+	for(int n = 1; n < q; ++n){
+		unsigned int x_next = x + ex_d[n];
+		unsigned int y_next = y + ey_d[n];
+
+		bool solid = cylinder_d[gpu_scalar_index(x_next, y_next)];
+
+		unsigned int noslip_n = noslip[n];
+		if (solid){
+			f2[gpu_fieldn_index(x, y, noslip_n)] = f2[gpu_fieldn_index(x, y, n)];
+		}
+	}
+}
+
+__device__ void gpu_bounce_back_top(){
+
+}
+
+__device__ void gpu_bounce_back_bot(){
+	
+}
 
 __host__ void init_equilibrium(double *f0, double *f1, double *r, double *u, double *v){
 
@@ -81,8 +164,11 @@ __global__ void gpu_init_equilibrium(double *f0, double *f1, double *r, double *
 
 __host__ void stream_collide_save(double *f0, double *f1, double *f2, double *f0neq, double *f1neq, double *r, double *u, double *v, bool save){
 
-	dim3 grid(Nx/nThreads, Ny, 1);
-	dim3 block(nThreads, 1, 1);
+	//dim3 grid(Nx/nThreads, Ny, 1);
+	//dim3 block(nThreads, 1, 1);
+
+	dim3 grid(1,1,1);
+	dim3 block(1,1,1);
 
 	gpu_stream_collide_save<<< grid, block >>>(f0, f1, f2, f0neq, f1neq, r, u, v, save);
 	getLastCudaError("gpu_stream_collide_save kernel error");
@@ -112,6 +198,17 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	double ft6 = f1[gpu_fieldn_index(xf1, yb1, 6)];
 	double ft7 = f1[gpu_fieldn_index(xf1, yf1, 7)];
 	double ft8 = f1[gpu_fieldn_index(xb1, yf1, 8)];
+
+	printf("Check stream\n");
+	printf("x: %d y: %d\n", x, y);
+	printf("f1: %g\n", f1[gpu_fieldn_index(x, y, 1)]);
+	printf("xb: %d y: %d\n", xb1, y);
+	printf("f1: %g\n", f1[gpu_fieldn_index(xb1, y, 1)]);
+
+	//unsigned int xn = x + 1;
+	//unsigned int xbn = (Nx_d + xn - 1)%Nx_d;
+	//printf("x: %d y: %d\n", xb1, y);
+	//printf("f1: %g\n", f1[gpu_fieldn_index(xb1, y, 1)]);
 
 	double f[] = {ft0, ft1, ft2, ft3, ft4, ft5, ft6, ft7, ft8};
 
@@ -174,113 +271,63 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		f2[gpu_fieldn_index(x, y, n)] = omega*f1neq[gpu_fieldn_index(x, y, n)] + tWrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
 	}
 
+	bool node_solid = cylinder_d[gpu_scalar_index(x, y)];
+	bool node_fluid = fluid_d[gpu_scalar_index(x, y)];
+
+	/*
+	if (node_solid){
+		gpu_noslip(x, y, f2);
+	}
+
+	if (node_fluid){
+		gpu_bounce_back(x, y, f2);
+	}
+	*/
+
 	int sidx = gpu_scalar_index(x, y);
 
 	if(x == 0){
+		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
+		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
+		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
-		gpu_zou_he_inlet(x, y, u_max_d, &f0, &f2, &r[sidx], &u[sidx], &v[sidx]);
+		printf("Before Zou He\n");
+		printf("f1: %g\n", f2[gpu_fieldn_index(x, y, 1)]);
 
+		gpu_zou_he_inlet(x, y, u_max_d, f0, f2, &f2[idx_1], &f2[idx_5], &f2[idx_8], &r[sidx], &u[sidx], &v[sidx]);
+		
+		printf("After Zou He\n");
+		printf("f1: %g\n", f2[idx_1]);
 	}
-	else if(x == Nx_d){
 
-		gpu_zou_he_outlet(x, y, &f0, &f2, &r[sidx], &u[sidx], &v[sidx]);
+	if(x == Nx_d){
+		unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
+		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
+		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
 
+		gpu_zou_he_outlet(x, y, f0, f2, &f2[idx_3], &f2[idx_6], &f2[idx_7], &r[sidx], &u[sidx], &v[sidx]);
 	}
 }
 
-// Boundary Conditions
-__device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double u_ini, double *f0, double *f2, double *r, double *u, double *v){
-
-	double ux = u_ini;
-	double uy = 0;
-
-	int 0idx = gpu_field0_index(x, y);
-	int 1idx = gpu_fieldn_index(x, y, 1);
-	int 2idx = gpu_fieldn_index(x, y, 2);
-	int 3idx = gpu_fieldn_index(x, y, 3);
-	int 4idx = gpu_fieldn_index(x, y, 4);
-	int 5idx = gpu_fieldn_index(x, y, 5);
-	int 6idx = gpu_fieldn_index(x, y, 6);
-	int 7idx = gpu_fieldn_index(x, y, 7);
-	int 8idx = gpu_fieldn_index(x, y, 8);
-
-
-	double rho = (f0[0] + f2[2idx] + f2[4idx] + 2*(f2[3idx] + f2[6idx] + f2[7idx]))/(1.0 - ux);
-	*f2[1idx] = f2[3idx] + 2.0/3.0*rho*ux;
-	*f2[5idx] = f2[7idx] - 0.5*(f2[2idx] - f2[4idx]) + 1.0/6.0*rho*ux;
-	*f2[8idx] = f2[6idx] + 0.5*(f2[2idx] - f2[4idx]) + 1.0/6.0*rho*ux;
-
-	*r = rho;
-	*u = ux;
-	*v = uy;
-}
-
-__device__ void gpu_zou_he_outlet(unsigned int x, unsigned int y, double *f0, double *f2, double *r, double *u, double *v){
-
-	rho = 1.0;
-	uy = 0.0;
-
-	int 0idx = gpu_field0_index(x, y);
-	int 1idx = gpu_fieldn_index(x, y, 1);
-	int 2idx = gpu_fieldn_index(x, y, 2);
-	int 3idx = gpu_fieldn_index(x, y, 3);
-	int 4idx = gpu_fieldn_index(x, y, 4);
-	int 5idx = gpu_fieldn_index(x, y, 5);
-	int 6idx = gpu_fieldn_index(x, y, 6);
-	int 7idx = gpu_fieldn_index(x, y, 7);
-	int 8idx = gpu_fieldn_index(x, y, 8);
-
-	ux = (f0[0] + f2[2idx] + f2[4idx] + 2*(f2[1idx] + f2[5idx] + f2[8idx]))/rho - 1.0;
-	*f2[3idx] = f2[1idx] - 2.0/3.0*rho*ux;
-	*f2[6idx] = f2[8idx] - 0.5*(f2[2idx] - f2[4idx]) - 1.0/6.0*rho*ux;
-	*f2[7idx] = f2[5idx] + 0.5*(f2[2idx] - f2[4idx]) - 1.0/6.0*rho*ux;
-
-	*r = rho;
-	*u = ux;
-	*v = uy;
-}
-
-__device__ noslip(){
-	
-}
-/*
 __host__ void compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop, double *prop_gpu, double *prop_host){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
 
-	gpu_compute_flow_properties<<< grid, block, 7*block.x*sizeof(double) >>>(t, r, u, v, prop_gpu);
+	gpu_compute_flow_properties<<< grid, block, block.x*sizeof(double) >>>(t, r, u, v, prop_gpu);
 	getLastCudaError("gpu_compute_flow_properties kernel error");
 
-	size_t prop_size_bytes = 7*grid.x*grid.y*sizeof(double);
+	size_t prop_size_bytes = grid.x*grid.y*sizeof(double);
 	checkCudaErrors(cudaMemcpy(prop_host, prop_gpu, prop_size_bytes, cudaMemcpyDeviceToHost));
 
 	double E = 0.0;
 
-	double sumrhoe2 = 0.0;
-	double sumuxe2 = 0.0;
-	double sumuye2 = 0.0;
-
-	double sumrhoa2 = 0.0;
-	double sumuxa2 = 0.0;
-	double sumuya2 = 0.0;
-
 	for(unsigned int i = 0; i < grid.x*grid.y; ++i){
 
-		E += prop_host[7*i];
-		sumrhoe2 += prop_host[7*i + 1];
-		sumuxe2 += prop_host[7*i + 2];
-		sumuye2 += prop_host[7*i + 3];
-
-		sumrhoa2 += prop_host[7*i + 4];
-		sumuxa2 += prop_host[7*i + 5];
-		sumuya2 += prop_host[7*i + 6];
+		E += prop_host[i];
 	}
 
 	prop[0] = E;
-	prop[1] = sqrt(sumrhoe2/sumrhoa2);
-	prop[2] = sqrt(sumuxe2/sumuxa2);
-	prop[3] = sqrt(sumuye2/sumuya2);
 }
 
 __global__ void gpu_compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop_gpu){
@@ -291,12 +338,6 @@ __global__ void gpu_compute_flow_properties(unsigned int t, double *r, double *u
 	extern __shared__ double data[];
 
 	double *E = data;
-	double *rhoe2 = data + blockDim.x;
-	double *uxe2 = data + 2*blockDim.x;
-	double *uye2 = data + 3*blockDim.x;
-	double *rhoa2 = data + 4*blockDim.x;
-	double *uxa2 = data + 5*blockDim.x;
-	double *uya2 = data + 6*blockDim.x;
 
 	double rho = r[gpu_scalar_index(x, y)];
 	double ux = u[gpu_scalar_index(x, y)];
@@ -304,36 +345,18 @@ __global__ void gpu_compute_flow_properties(unsigned int t, double *r, double *u
 
 	E[threadIdx.x] = rho*(ux*ux + uy*uy);
 
-	double rhoa, uxa, uya;
-	//taylor_green_eval(t, x, y, &rhoa, &uxa, &uya);
-
-	rhoe2[threadIdx.x] = (rho - rhoa)*(rho - rhoa);
-	uxe2[threadIdx.x] = (ux - uxa)*(ux - uxa);
-	uye2[threadIdx.x] = (uy - uya)*(uy - uya);
-
-	rhoa2[threadIdx.x] = (rhoa - rho0_d)*(rhoa - rho0_d);
-	uxa2[threadIdx.x] = uxa*uxa;
-	uya2[threadIdx.x] = uya*uya;
-
 	__syncthreads();
 
 	if (threadIdx.x == 0){
 		
-		size_t idx = 7*(gridDim.x*blockIdx.y + blockIdx.x);
+		size_t idx = 1*(gridDim.x*blockIdx.y + blockIdx.x);
 
-		for(int n = 0; n < 7; ++n){
+		for(int n = 0; n < 1; ++n){
 			prop_gpu[idx+n] = 0.0;
 		}
 
 		for(int i = 0; i < blockDim.x; ++i){
 			prop_gpu[idx] += E[i];
-			prop_gpu[idx+1] += rhoe2[i];
-			prop_gpu[idx+2] += uxe2[i];
-			prop_gpu[idx+3] += uye2[i];
-
-			prop_gpu[idx+4] += rhoa2[i];
-			prop_gpu[idx+5] += uxa2[i];
-			prop_gpu[idx+6] += uya2[i];
 		}
 	}
 }
@@ -341,11 +364,11 @@ __global__ void gpu_compute_flow_properties(unsigned int t, double *r, double *u
 __host__ void report_flow_properties(unsigned int t, double *rho, double *ux, double *uy,
 									 double *prop_gpu, double *prop_host){
 
-	double prop[4];
+	double prop[1];
 	compute_flow_properties(t, rho, ux, uy, prop, prop_gpu, prop_host);
-	printf("%u, %g, %g, %g, %g\n", t, prop[0], prop[1], prop[2], prop[3]);
+	printf("%u, %g\n", t, prop[0]);
 }
-*/
+
 __host__ void save_scalar(const char* name, double *scalar_gpu, double *scalar_host, unsigned int n){
 
 	char filename[128];
@@ -445,8 +468,10 @@ __host__ void generate_mesh(bool *mesh, std::string mode){
 	gpu_generate_mesh<<< grid, block >>>(temp_mesh, mode_num);
 	getLastCudaError("gpu_generate_mesh kernel error");
 
-	//gpu_print_mesh<<< 1, 1 >>>(mode_num);
-	//printf("\n");
+	if(meshprint){
+		gpu_print_mesh<<< 1, 1 >>>(mode_num);
+		printf("\n");
+	}
 
 	checkCudaErrors(cudaFree(temp_mesh));
 
@@ -477,7 +502,7 @@ __global__ void gpu_generate_mesh(bool *mesh_h, int mode){
 
 	
 }
-/*
+
 __global__ void gpu_print_mesh(int mode){
 	if(mode == 1){
 		for(int y = 0; y < Ny_d; ++y){
@@ -497,4 +522,30 @@ __global__ void gpu_print_mesh(int mode){
 	}
 	
 }
-*/
+
+__host__ void initialization(double *r, double *u, double *v){
+	checkCudaErrors(cudaMemset(r, 1, Nx*Ny*sizeof(double)));
+	checkCudaErrors(cudaMemset(u, 0.04, Nx*Ny*sizeof(double)));
+	checkCudaErrors(cudaMemset(v, 0, Nx*Ny*sizeof(double)));
+
+	dim3 grid(Nx/nThreads, Ny, 1);
+	dim3 block(nThreads, 1, 1);
+
+	gpu_initialization<<< grid, block>>>(1.0, r);
+	getLastCudaError("gpu_initialization kernel error");
+
+	gpu_initialization<<< grid, block>>>(u_max, u);
+	getLastCudaError("gpu_initialization kernel error");
+
+	gpu_initialization<<< grid, block>>>(0.0, v);
+	getLastCudaError("gpu_initialization kernel error");
+}
+
+__global__ void gpu_initialization(const double value, double *array){
+
+	unsigned int y = blockIdx.y;
+	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
+
+	array[gpu_scalar_index(x, y)] = value;
+
+}
