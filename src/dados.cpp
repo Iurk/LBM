@@ -30,6 +30,7 @@ namespace myGlobals{
 	unsigned int NMSG = simulation["NMSG"].as<int>();
 	bool computeFlowProperties = simulation["computeFlowProperties"].as<bool>();
 	bool quiet = simulation["quiet"].as<bool>();
+	bool meshprint = simulation["meshprint"].as<bool>();
 
 	//GPU
 	unsigned int nThreads = gpu["nThreads"].as<unsigned int>();

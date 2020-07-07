@@ -10,7 +10,7 @@ namespace myGlobals{
 
 	//Simulation
 	extern unsigned int NSTEPS, NSAVE, NMSG;
-	extern bool computeFlowProperties, quiet;
+	extern bool computeFlowProperties, quiet, meshprint;
 
 	//GPU
 	extern unsigned int nThreads;
