@@ -9,17 +9,18 @@ cylinder:
 
 simulation:
   lattice: D2Q9
-  NSTEPS: 5000
-  NSAVE: 50
-  NMSG: 50
-  computeFlowProperties: false
+  NSTEPS: 5
+  NSAVE: 1
+  NMSG: 1
+  computeFlowProperties: true
   quiet: true
+  meshprint: false
 
 gpu:
   nThreads: 32
 
 input:
-  Re: 10
+  Re: 7.64
   u_max: 0.04
   rho0: 1.0
 
