@@ -7,13 +7,18 @@ Created on Thu May 28 16:27:54 2020
 """
 import yaml
 import numpy as np
+from os import walk
+import utilidades as util
 import funcoes_graficos as fg
 
+main = "./bin"
 fileyaml = "./bin/dados.yml"
-pasta = "Velocity"
+velocity = "Velocity"
+
 
 datafile = open(fileyaml)
 data = yaml.load(datafile, Loader=yaml.FullLoader)
+datafile.close()
 
 Nx = data['domain']['Nx']
 Ny = data['domain']['Ny']
@@ -24,26 +29,28 @@ digitos = len(str(Steps))
 
 idx_files = ["%0{}d".format(digitos) % i for i in range(0, Steps+Saves, Saves)]
 
-files = ["rho", "ux", "uy"]
-folder = "./Results/"
+variables = ["rho", "ux", "uy"]
+results = "./bin/Results/"
 
 rho = np.empty((len(idx_files), Ny, Nx))
 ux = np.empty_like(rho)
 uy = np.empty_like(rho)
 dic = {"rho": rho, "ux":ux, "uy":uy}
 
-for file in files:
+for var in variables:
+    path = results + var
     i = 0
-    print('Getting ' + file + ' data...')
-    for step in idx_files:
-        full_path = folder + file + step + '.bin'
-        dic[file][i] = np.fromfile(full_path).reshape(Ny, Nx)
-        i += 1
-        
+    print('Getting ' + var + ' data...')
+    for root, dirs, files in walk(path):
+        for file in files:
+            path = root + "/%s" % file
+            dic[var][i] = np.fromfile(path).reshape(Ny, Nx)
+            i += 1
+    
 u_mod = np.sqrt(ux**2 + uy**2)
 
-pasta_img = fg.criar_pasta('Images', main_root='Velocity')
-pasta_stream = fg.criar_pasta('Stream', main_root='Velocity')
+pasta_img = util.criar_pasta('Images', folder=velocity, main_root=main)
+pasta_stream = util.criar_pasta('Stream', folder=velocity, main_root=main)
 
 print('Generating images...')
 for i in range(len(idx_files)):
