@@ -10,7 +10,7 @@ using namespace myGlobals;
 int main(int argc, char const *argv[]){
 
 	// Writing Simulation Parameters
-	printf("Simulating Taylor-Green vortex decay\n");
+	printf("Simulating the Poiseulle Flow\n");
 	printf("  Domain size: %ux%u\n", Nx, Ny);
 	printf("           nu: %g\n", nu);
 	printf("          tau: %g\n", tau);
