@@ -7,6 +7,7 @@ Created on Tue Jun 30 15:49:54 2020
 """
 import yaml
 import numpy as np
+import utilidades as utils
 
 def generate_solid(Nx, Ny, Cx, Cy, D):
     solid = np.zeros(Nx*Ny, dtype=bool)
@@ -56,9 +57,17 @@ Cy = eval(Cy)
            
 cylinder = generate_solid(Nx, Ny, Cx, Cy, D)
 fluid = fluid_wall(Nx, Ny, q, ex, ey, cylinder)
-        
-solid_file = open('./bin/Mesh/mesh.bin', 'wb')
-fluid_file = open('./bin/Mesh/fluid_wall.bin', 'wb')
+
+pasta = utils.criar_pasta("Mesh", main_root="./bin")
+
+name_solid = "mesh.bin"
+name_fluid = "fluid_wall.bin"
+
+solid_path = pasta + "/%s" % name_solid
+fluid_path = pasta + "/%s" % name_fluid
+
+solid_file = open(solid_path, 'wb')
+fluid_file = open(fluid_path, 'wb')
 
 solid_file.write(bytearray(cylinder))
 fluid_file.write(bytearray(fluid))
