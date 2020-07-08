@@ -43,25 +43,5 @@ def animation(nome, pasta, pasta_imagens):
     
 def __ordenar(item):
     return int(item.split('.')[1])
-
-def criar_pasta(name, main_root='./'):
-    from shutil import rmtree
-    from os import listdir, mkdir, getcwd
-    from os.path import isdir, join
     
-    onlyfolders = [f for f in listdir(getcwd()) if isdir(join(f))]
-    
-    if main_root in onlyfolders:
-        onlyfolders = [f for f in listdir(main_root) if isdir(join(main_root, f))]
-        
-        pasta = main_root + '/%s' % name
-        if name not in onlyfolders:
-            mkdir(pasta)
-        else:
-            rmtree(pasta)
-            criar_pasta(name, main_root=main_root)
-        return pasta
-    else:
-        mkdir(main_root)
-        criar_pasta(name, main_root=main_root)
         
