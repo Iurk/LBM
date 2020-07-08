@@ -1,6 +1,6 @@
 domain:
   Nx: 32
-  Ny: 16
+  Ny: 32
 
 cylinder:
   Cx: Nx/4
@@ -9,9 +9,9 @@ cylinder:
 
 simulation:
   lattice: D2Q9
-  NSTEPS: 5
-  NSAVE: 1
-  NMSG: 1
+  NSTEPS: 1000
+  NSAVE: 50
+  NMSG: 50
   computeFlowProperties: true
   quiet: true
   meshprint: false
