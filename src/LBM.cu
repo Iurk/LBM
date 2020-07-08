@@ -3,6 +3,9 @@
 #include <math.h>
 
 #include <cuda.h>
+#include <dirent.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 #include "paths.h"
 #include "LBM.h"
@@ -45,7 +48,7 @@ __global__ void gpu_print_mesh(int);
 __global__ void gpu_initialization(const double, double *);
 
 // Boundary Conditions
-__device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double u_ini, double *f0, double *f2, double *f1,
+__device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double u_ini, double *f0, double *f, double *f1,
 								double *f5, double *f8, double *r, double *u, double *v){
 
 	double ux = u_ini;
@@ -58,17 +61,17 @@ __device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double u_ini, d
 	unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
 	unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
 
-	double rho = (f0[idx_0] + f2[idx_2] + f2[idx_4] + 2*(f2[idx_3] + f2[idx_6] + f2[idx_7]))/(1.0 - ux);
-	*f1 = f2[idx_3] + 2.0/3.0*rho*ux;
-	*f5 = f2[idx_7] - 0.5*(f2[idx_2] - f2[idx_4]) + 1.0/6.0*rho*ux;
-	*f8 = f2[idx_6] + 0.5*(f2[idx_2] - f2[idx_4]) + 1.0/6.0*rho*ux;
+	double rho = (f0[idx_0] + f[idx_2] + f[idx_4] + 2*(f[idx_3] + f[idx_6] + f[idx_7]))/(1.0 - ux);
+	*f1 = f[idx_3] + 2.0/3.0*rho*ux;
+	*f5 = f[idx_7] - 0.5*(f[idx_2] - f[idx_4]) + 1.0/6.0*rho*ux;
+	*f8 = f[idx_6] + 0.5*(f[idx_2] - f[idx_4]) + 1.0/6.0*rho*ux;
 
 	*r = rho;
 	*u = ux;
 	*v = uy;
 }
 
-__device__ void gpu_zou_he_outlet(unsigned int x, unsigned int y, double *f0, double *f2, double *f3,
+__device__ void gpu_zou_he_outlet(unsigned int x, unsigned int y, double *f0, double *f, double *f3,
 								double *f6, double *f7, double *r, double *u, double *v){
 
 	double rho = 1.0;
@@ -81,10 +84,10 @@ __device__ void gpu_zou_he_outlet(unsigned int x, unsigned int y, double *f0, do
 	unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
 	unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
-	double ux = (f0[idx_0] + f2[idx_2] + f2[idx_4] + 2*(f2[idx_1] + f2[idx_5] + f2[idx_8]))/rho - 1.0;
-	*f3 = f2[idx_1] - 2.0/3.0*rho*ux;
-	*f6 = f2[idx_8] - 0.5*(f2[idx_2] - f2[idx_4]) - 1.0/6.0*rho*ux;
-	*f7 = f2[idx_5] + 0.5*(f2[idx_2] - f2[idx_4]) - 1.0/6.0*rho*ux;
+	double ux = (f0[idx_0] + f[idx_2] + f[idx_4] + 2*(f[idx_1] + f[idx_5] + f[idx_8]))/rho - 1.0;
+	*f3 = f[idx_1] - 2.0/3.0*rho*ux;
+	*f6 = f[idx_8] - 0.5*(f[idx_2] - f[idx_4]) - 1.0/6.0*rho*ux;
+	*f7 = f[idx_5] + 0.5*(f[idx_2] - f[idx_4]) - 1.0/6.0*rho*ux;
 
 	*r = rho;
 	*u = ux;
@@ -118,12 +121,26 @@ __device__ void gpu_bounce_back(unsigned int x, unsigned int y, double *f2){
 	}
 }
 
-__device__ void gpu_bounce_back_top(){
+__device__ void gpu_bounce_back_top(unsigned int x, unsigned int y, double *f, double *f4, double *f7, double *f8){
 
+	unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
+	unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
+	unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
+
+	*f4 = f[idx_2];
+	*f7 = f[idx_5];
+	*f8 = f[idx_6];
 }
 
-__device__ void gpu_bounce_back_bot(){
-	
+__device__ void gpu_bounce_back_bot(unsigned int x, unsigned int y, double *f, double *f2, double *f5, double *f6){
+
+	unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
+	unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
+	unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
+
+	*f2 = f[idx_4];
+	*f5 = f[idx_7];
+	*f6 = f[idx_8];
 }
 
 __host__ void init_equilibrium(double *f0, double *f1, double *r, double *u, double *v){
@@ -198,17 +215,6 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	double ft6 = f1[gpu_fieldn_index(xf1, yb1, 6)];
 	double ft7 = f1[gpu_fieldn_index(xf1, yf1, 7)];
 	double ft8 = f1[gpu_fieldn_index(xb1, yf1, 8)];
-
-	printf("Check stream\n");
-	printf("x: %d y: %d\n", x, y);
-	printf("f1: %g\n", f1[gpu_fieldn_index(x, y, 1)]);
-	printf("xb: %d y: %d\n", xb1, y);
-	printf("f1: %g\n", f1[gpu_fieldn_index(xb1, y, 1)]);
-
-	//unsigned int xn = x + 1;
-	//unsigned int xbn = (Nx_d + xn - 1)%Nx_d;
-	//printf("x: %d y: %d\n", xb1, y);
-	//printf("f1: %g\n", f1[gpu_fieldn_index(xb1, y, 1)]);
 
 	double f[] = {ft0, ft1, ft2, ft3, ft4, ft5, ft6, ft7, ft8};
 
@@ -286,18 +292,28 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	int sidx = gpu_scalar_index(x, y);
 
+	if(y == 0){
+		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
+		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
+		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
+
+		gpu_bounce_back_bot(x, y, f2, &f2[idx_2], &f2[idx_5], &f2[idx_6]);
+	}
+
+	if(y == Ny_d){
+		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
+		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
+		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
+
+		gpu_bounce_back_top(x, y, f2, &f2[idx_4], &f2[idx_7], &f2[idx_8]);
+	}
+
 	if(x == 0){
 		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
 		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
 		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
-		printf("Before Zou He\n");
-		printf("f1: %g\n", f2[gpu_fieldn_index(x, y, 1)]);
-
 		gpu_zou_he_inlet(x, y, u_max_d, f0, f2, &f2[idx_1], &f2[idx_5], &f2[idx_8], &r[sidx], &u[sidx], &v[sidx]);
-		
-		printf("After Zou He\n");
-		printf("f1: %g\n", f2[idx_1]);
 	}
 
 	if(x == Nx_d){
@@ -371,12 +387,20 @@ __host__ void report_flow_properties(unsigned int t, double *rho, double *ux, do
 
 __host__ void save_scalar(const char* name, double *scalar_gpu, double *scalar_host, unsigned int n){
 
-	char filename[128];
+	char filename[128], path[128];
 	char format[50];
 
 	int ndigits = floor(log10((double)NSTEPS) + 1.0);
 
-	sprintf(format, "%s%%s%%0%dd.bin", folder, ndigits);
+	sprintf(format, "%s/%%s/", folder);
+	sprintf(path, format, name);
+
+	DIR *dir = opendir(path);
+	if(ENOENT == errno){
+		mkdir(path, ACCESSPERMS);
+	}
+
+	sprintf(format, "%s%%s%%0%dd.bin", path, ndigits);
 	sprintf(filename, format, name, n);
 
 	checkCudaErrors(cudaMemcpy(scalar_host, scalar_gpu, mem_size_scalar, cudaMemcpyDeviceToHost));
@@ -394,7 +418,6 @@ __host__ void save_scalar(const char* name, double *scalar_gpu, double *scalar_h
 			printf("Saved to %s\n", filename);
 		}
 	}
-
 	fclose(fout);
 }
 
@@ -474,7 +497,6 @@ __host__ void generate_mesh(bool *mesh, std::string mode){
 	}
 
 	checkCudaErrors(cudaFree(temp_mesh));
-
 }
 
 __global__ void gpu_init_mesh(bool *init_mesh, int mode){
@@ -498,9 +520,7 @@ __global__ void gpu_generate_mesh(bool *mesh_h, int mode){
 	else if(mode == 2){
 		fluid_d[Nx_d*y + x] = mesh_h[Nx_d*y + x];
 		__syncthreads();
-	}
-
-	
+	}	
 }
 
 __global__ void gpu_print_mesh(int mode){
@@ -520,7 +540,6 @@ __global__ void gpu_print_mesh(int mode){
 		printf("\n");
 		}
 	}
-	
 }
 
 __host__ void initialization(double *r, double *u, double *v){
@@ -547,5 +566,4 @@ __global__ void gpu_initialization(const double value, double *array){
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 
 	array[gpu_scalar_index(x, y)] = value;
-
 }
