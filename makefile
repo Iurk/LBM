@@ -21,8 +21,9 @@ SRCDIR := src
 INCDIR := inc /usr/local/include
 OBJDIR := obj
 BINDIR := bin
-VELOCITY := Velocity
-RESULTS := Results
+VELOCITY := bin/Velocity
+RESULTS := bin/Results
+MESH := bin/Mesh
 
 # Files
 C_FILES := $(wildcard $(SRCDIR)/*.c)
@@ -55,7 +56,7 @@ DEPFLAGS := -MMD
 COMPILE.c = $(NVCC) $(DEPFLAGS) -g $(INCDIRS) -c
 COMPILE.cpp = $(NVCC) $(DEPFLAGS) $(CXXFLAGS) $(INCDIRS) $(NVCCARCHFLAG) $(NVCCFLAGS)
 
-.PHONY: all clean run
+.PHONY: all clean refresh run
 
 all: $(EXE)
 
@@ -79,11 +80,18 @@ $(OBJDIR):
 clean:
 	@echo Cleaning up...
 	@rm -f -r $(OBJDIR)
-	@rm -f -r $(DEPDIR)
-	@rm -f $(EXE)
 	@rm -f -r $(VELOCITY)/*
 	@rm -f -r $(RESULTS)/*
+	@rm -f -r $(MESH)/*
+	@rm -f $(EXE)
 	@rm -f *.gif
+	@echo Done!
+
+refresh:
+	@echo Cleaning up the results...
+	@rm -f -r $(RESULTS)/*
+	@echo Cleaning up the mesh...
+	@rm -f -r $(MESH)/*
 	@echo Done!
 
 # Running
