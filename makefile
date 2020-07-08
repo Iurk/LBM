@@ -1,8 +1,8 @@
 # MakeFile
 
 # Python Scripts
-PYMESH = Python/mesh.py
-PYDADOS = Python/data_process.py
+PYMESH = python/mesh.py
+PYDADOS = python/data_process.py
 
 # Program Name
 EXE = lbm
