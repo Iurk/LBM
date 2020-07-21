@@ -41,17 +41,18 @@ __device__ __forceinline__ size_t gpu_fieldn_index(unsigned int x, unsigned int 
 __global__ void gpu_init_equilibrium(double*, double*, double*, double*, double*);
 __global__ void gpu_stream_collide_save(double *, double *, double*, double*, double*, double*, double*, double*, bool);
 __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, double*, double*);
-__global__ void gpu_init_device_var(int *, int *);
+__global__ void gpu_init_e(int *, int);
+__global__ void gpu_pop_e(int *, int);
 __global__ void gpu_init_mesh(bool *, int);
 __global__ void gpu_generate_mesh(bool *, int);
 __global__ void gpu_print_mesh(int);
 __global__ void gpu_initialization(const double, double *);
 
 // Boundary Conditions
-__device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double u_ini, double *f0, double *f, double *f1,
+__device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f0, double *f, double *f1,
 								double *f5, double *f8, double *r, double *u, double *v){
 
-	double ux = u_ini;
+	double ux = u_max_d;
 	double uy = 0;
 
 	unsigned int idx_0 = gpu_field0_index(x, y);
@@ -145,8 +146,11 @@ __device__ void gpu_bounce_back_bot(unsigned int x, unsigned int y, double *f, d
 
 __host__ void init_equilibrium(double *f0, double *f1, double *r, double *u, double *v){
 
-	dim3 grid(Nx/nThreads, Ny, 1);
-	dim3 block(nThreads, 1, 1);
+	//dim3 grid(Nx/nThreads, Ny, 1);
+	//dim3 block(nThreads, 1, 1);
+
+	dim3 grid(1, 1, 1);
+	dim3 block(1, 1, 1);
 
 	gpu_init_equilibrium<<< grid, block >>>(f0, f1, r, u, v);
 	getLastCudaError("gpu_init_equilibrium kernel error");
@@ -225,6 +229,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		ux_i += f[n]*ex_d[n];
 		uy_i += f[n]*ey_d[n];
 	}
+
 
 	double rhoinv = 1.0/rho;
 
@@ -311,7 +316,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
 		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
-		gpu_zou_he_inlet(x, y, u_max_d, f0, f2, &f2[idx_1], &f2[idx_5], &f2[idx_8], &r[sidx], &u[sidx], &v[sidx]);
+		gpu_zou_he_inlet(x, y, f0, f2, &f2[idx_1], &f2[idx_5], &f2[idx_8], &r[sidx], &u[sidx], &v[sidx]);
 	}
 
 	if(x == Nx_d){
@@ -386,7 +391,7 @@ __host__ void report_flow_properties(unsigned int t, double *rho, double *ux, do
 __host__ void save_scalar(const char* name, double *scalar_gpu, double *scalar_host, unsigned int n){
 
 	char filename[128], path[128];
-	char format[50];
+	char format[512];
 
 	int ndigits = floor(log10((double)NSTEPS) + 1.0);
 
@@ -438,30 +443,61 @@ void wrapper_lattice(unsigned int *ndir, double *c, double *w_0, double *w_s, do
 	checkCudaErrors(cudaMemcpyToSymbol(wd_d, w_d, sizeof(double)));
 }
 
-__host__ void init_device_var(){
+__host__ void generate_e(int *e, std::string mode){
+
+	int mode_num;
 
 	dim3 grid(1, 1, 1);
-	dim3 block(1, 1, 1);
+	dim3 block(ndir, 1, 1);
 
-	int *temp_ex_d, *temp_ey_d;
+	int *temp_e;
 
-	checkCudaErrors(cudaMalloc((void**)&temp_ex_d, ndir*sizeof(int)));
-	checkCudaErrors(cudaMalloc((void**)&temp_ey_d, ndir*sizeof(int)));
+	size_t mem_e = ndir*sizeof(int);
 
-	checkCudaErrors(cudaMemcpy(temp_ex_d, ex, ndir*sizeof(int), cudaMemcpyHostToDevice));
-	checkCudaErrors(cudaMemcpy(temp_ey_d, ey, ndir*sizeof(int), cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMalloc((void**)&temp_e, mem_e));
+	checkCudaErrors(cudaMemset(temp_e, 0, mem_e));
 
-	gpu_init_device_var<<< grid, block >>>(temp_ex_d, temp_ey_d);
-	getLastCudaError("gpu_init_device_var kernel error");
+	if(mode == "x"){
+		mode_num = 1;
+	}
+	else if(mode == "y"){
+		mode_num = 2;
+	}
 
-	checkCudaErrors(cudaFree(temp_ex_d));
-	checkCudaErrors(cudaFree(temp_ey_d));
+	//printf("mode_num: %d\n", mode_num);
+
+	gpu_init_e<<< 1, 1 >>>(temp_e, mode_num);
+	getLastCudaError("gpu_init_e kernel error");
+
+	checkCudaErrors(cudaMemcpy(temp_e, e, mem_e, cudaMemcpyHostToDevice));
+
+	gpu_pop_e<<< grid, block >>>(temp_e, mode_num);
+	getLastCudaError("gpu_pop_e kernel error");
+
 }
 
-__global__ void gpu_init_device_var(int *temp_ex_d, int *temp_ey_d){
-	ex_d = temp_ex_d;
-	__syncthreads();
-	ey_d = temp_ey_d;
+__global__ void gpu_init_e(int *init_e, int mode){
+	if(mode == 1){
+		ex_d = init_e;
+	}
+	else if(mode == 2){
+		ey_d = init_e;
+	}
+}
+
+__global__ void gpu_pop_e(int *e_h, int mode){
+
+	unsigned int n = threadIdx.x;
+
+	if(mode == 1){
+		ex_d[n] = e_h[n];
+		__syncthreads();
+	}
+	else if(mode == 2){
+		ey_d[n] = e_h[n];
+		__syncthreads();
+	}
+
 }
 
 __host__ void generate_mesh(bool *mesh, std::string mode){
@@ -495,8 +531,6 @@ __host__ void generate_mesh(bool *mesh, std::string mode){
 		gpu_print_mesh<<< 1, 1 >>>(mode_num);
 		printf("\n");
 	}
-
-	checkCudaErrors(cudaFree(temp_mesh));
 }
 
 __global__ void gpu_init_mesh(bool *init_mesh, int mode){

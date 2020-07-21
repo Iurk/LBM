@@ -11,7 +11,7 @@ void report_flow_properties(unsigned int, double *, double *, double *, double *
 void save_scalar(const char* , double *, double *, unsigned int);
 void wrapper_input(unsigned int *, unsigned int *, double *, double *, double *, const double *);
 void wrapper_lattice(unsigned int *, double *, double *, double *, double *);
-void init_device_var();
+void generate_e(int *, std::string);
 void generate_mesh(bool *, std::string);
 
 #define checkCudaErrors(err) __checkCudaErrors(err, #err, __FILE__, __LINE__)
