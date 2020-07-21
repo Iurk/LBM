@@ -88,7 +88,7 @@ clean:
 	@echo Done!
 
 mesh:
-	echo Generating mesh...
+	@echo Generating mesh...
 	@python $(PYMESH)
 	@echo Done!
 
