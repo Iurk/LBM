@@ -96,12 +96,15 @@ int main(int argc, char const *argv[]){
 
 	wrapper_lattice(ptrNdir, ptrcs, ptrW0, ptrWs, ptrWd);
 
-	generate_e(ex, "x");
-	generate_e(ey, "y");
+	int *ex_gpu, *ey_gpu;
+	bool *solid_gpu, *fluid_gpu;
+	
+	ex_gpu = generate_e(ex, "x");
+	ey_gpu = generate_e(ey, "y");
 
 	// Generating Mesh
-	generate_mesh(cylinder, "solid");
-	generate_mesh(fluid, "fluid");
+	solid_gpu = generate_mesh(cylinder, "solid");
+	fluid_gpu = generate_mesh(fluid, "fluid");
 
 	// Initialization
 	initialization(rho_gpu, ux_gpu, uy_gpu);
@@ -192,7 +195,10 @@ int main(int argc, char const *argv[]){
 	checkCudaErrors(cudaFree(ux_gpu));
 	checkCudaErrors(cudaFree(uy_gpu));
 	checkCudaErrors(cudaFree(prop_gpu));
-
+	checkCudaErrors(cudaFree(ex_gpu));
+	checkCudaErrors(cudaFree(ey_gpu));
+	checkCudaErrors(cudaFree(solid_gpu));
+	checkCudaErrors(cudaFree(fluid_gpu));
 	free(scalar_host);
 
 	cudaDeviceReset();
