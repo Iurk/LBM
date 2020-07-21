@@ -176,7 +176,6 @@ __global__ void gpu_init_equilibrium(double *f0, double *f1, double *r, double *
 	double Wrho[] = {w0r, wsr, wsr, wsr, wsr, wdr, wdr, wdr, wdr};
 
 	f0[gpu_field0_index(x, y)] = Wrho[0]*(omusq);
-
 	for(int n = 1; n < q; ++n){
 		double eidotu = ux*ex_d[n] + uy*ey_d[n];
 		f1[gpu_fieldn_index(x, y, n)] = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
@@ -443,7 +442,7 @@ void wrapper_lattice(unsigned int *ndir, double *c, double *w_0, double *w_s, do
 	checkCudaErrors(cudaMemcpyToSymbol(wd_d, w_d, sizeof(double)));
 }
 
-__host__ void generate_e(int *e, std::string mode){
+__host__ int* generate_e(int *e, std::string mode){
 
 	int mode_num;
 
@@ -464,8 +463,6 @@ __host__ void generate_e(int *e, std::string mode){
 		mode_num = 2;
 	}
 
-	//printf("mode_num: %d\n", mode_num);
-
 	gpu_init_e<<< 1, 1 >>>(temp_e, mode_num);
 	getLastCudaError("gpu_init_e kernel error");
 
@@ -473,6 +470,8 @@ __host__ void generate_e(int *e, std::string mode){
 
 	gpu_pop_e<<< grid, block >>>(temp_e, mode_num);
 	getLastCudaError("gpu_pop_e kernel error");
+
+	return temp_e;
 
 }
 
@@ -497,10 +496,9 @@ __global__ void gpu_pop_e(int *e_h, int mode){
 		ey_d[n] = e_h[n];
 		__syncthreads();
 	}
-
 }
 
-__host__ void generate_mesh(bool *mesh, std::string mode){
+__host__ bool* generate_mesh(bool *mesh, std::string mode){
 
 	int mode_num;
 
@@ -531,6 +529,8 @@ __host__ void generate_mesh(bool *mesh, std::string mode){
 		gpu_print_mesh<<< 1, 1 >>>(mode_num);
 		printf("\n");
 	}
+
+	return temp_mesh;
 }
 
 __global__ void gpu_init_mesh(bool *init_mesh, int mode){
