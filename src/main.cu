@@ -96,7 +96,8 @@ int main(int argc, char const *argv[]){
 
 	wrapper_lattice(ptrNdir, ptrcs, ptrW0, ptrWs, ptrWd);
 
-	init_device_var();
+	generate_e(ex, "x");
+	generate_e(ey, "y");
 
 	// Generating Mesh
 	generate_mesh(cylinder, "solid");
@@ -191,6 +192,7 @@ int main(int argc, char const *argv[]){
 	checkCudaErrors(cudaFree(ux_gpu));
 	checkCudaErrors(cudaFree(uy_gpu));
 	checkCudaErrors(cudaFree(prop_gpu));
+
 	free(scalar_host);
 
 	cudaDeviceReset();
