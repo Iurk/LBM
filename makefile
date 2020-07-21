@@ -56,7 +56,7 @@ DEPFLAGS := -MMD
 COMPILE.c = $(NVCC) $(DEPFLAGS) -g $(INCDIRS) -c
 COMPILE.cpp = $(NVCC) $(DEPFLAGS) $(CXXFLAGS) $(INCDIRS) $(NVCCARCHFLAG) $(NVCCFLAGS)
 
-.PHONY: all clean refresh run
+.PHONY: all clean mesh refresh run
 
 all: $(EXE)
 
@@ -85,6 +85,11 @@ clean:
 	@rm -f -r $(MESH)/*
 	@rm -f $(EXE)
 	@rm -f *.gif
+	@echo Done!
+
+mesh:
+	echo Generating mesh...
+	@python $(PYMESH)
 	@echo Done!
 
 refresh:
