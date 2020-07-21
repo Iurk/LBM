@@ -246,11 +246,9 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	double tw0r = tauinv*w0_d*rho; 
 	double twsr = tauinv*ws_d*rho; 
-	double twdr = tauinv*wd_d*rho; 
 
 	double W[] = {w0_d, ws_d, ws_d, ws_d, ws_d, wd_d, wd_d, wd_d, wd_d};
 	double Wrho[] = {w0r, wsr, wsr, wsr, wsr, wdr, wdr, wdr, wdr};
-	double tWrho[] = {tw0r, twsr, twsr, twsr, twsr, twdr, twdr, twdr, twdr};
 
 	double omusq = 1.0 - B*(ux*ux + uy*uy);
 
@@ -269,12 +267,12 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		tauyy += f1neq[gpu_fieldn_index(x, y, n)]*ey_d[n]*ey_d[n];
 	}
 
-	f0[gpu_field0_index(x, y)] = omega*f0neq[gpu_field0_index(x, y)] + tWrho[0]*(omusq);
+	f0[gpu_field0_index(x, y)] = omega*f0neq[gpu_field0_index(x, y)] + Wrho[0]*(omusq);
 
 	for(int n = 1; n < q; ++n){
 		f1neq[gpu_fieldn_index(x, y, n)] = B*W[n]*(tauxx*(A*ex_d[n] - 1.0) + 2.0*tauxy*A*ex_d[n]*ey_d[n] + tauyy*(A*ey_d[n] - 1.0));
 		double eidotu = ux*ex_d[n] + uy*ey_d[n];
-		f2[gpu_fieldn_index(x, y, n)] = omega*f1neq[gpu_fieldn_index(x, y, n)] + tWrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
+		f2[gpu_fieldn_index(x, y, n)] = omega*f1neq[gpu_fieldn_index(x, y, n)] + Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
 	}
 
 	bool node_solid = cylinder_d[gpu_scalar_index(x, y)];
@@ -391,6 +389,8 @@ __host__ void save_scalar(const char* name, double *scalar_gpu, double *scalar_h
 	char format[50];
 
 	int ndigits = floor(log10((double)NSTEPS) + 1.0);
+
+	// Criar verificação da pasta Results
 
 	sprintf(format, "%s/%%s/", folder);
 	sprintf(path, format, name);
