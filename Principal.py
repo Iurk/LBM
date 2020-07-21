@@ -21,14 +21,14 @@ def pressao(rho, cs):
 #***** Entrada de Dados *****
 L = 1       # Comprimento do túnel [m]
 H = 2.5     # Altura do túnel [m]
-Nx = 256    # Número de partículas em x [Lattice units]
-Ny = 128    # Número de partículas em y [Lattice units]
+Nx = 32    # Número de partículas em x [Lattice units]
+Ny = 32    # Número de partículas em y [Lattice units]
 
 Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = 128    # Diâmetro do Cilindro [Lattice units]
+D_est = 4    # Diâmetro do Cilindro [Lattice units]
 
-Reynolds = [300]    # Reynolds Numbers
+Reynolds = [7.64]    # Reynolds Numbers
 cl_Re = []
 cd_Re = []
 
@@ -40,7 +40,7 @@ uini = 0.04
 mode = 'Constante'
 #escoamento = 'Turbulento'
 
-maxiter = 5000      # Número de Iterações
+maxiter = 1000      # Número de Iterações
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
@@ -85,7 +85,7 @@ for Re in Reynolds:
 
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
-        f = LBM.condicao_wall(Nx, Ny, solido, e, n, f, fout)
+        # f = LBM.condicao_wall(Nx, Ny, solido, e, n, f, fout)
         
         Forca = LBM.forca(Nx, Ny, solido, e, n, fout, f)
         cl, cd = LBM.coeficientes(Nx, Ny, D_est, uini, rho_ar, Forca)
