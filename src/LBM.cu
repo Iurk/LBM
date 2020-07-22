@@ -46,7 +46,8 @@ __global__ void gpu_pop_e(int *, int);
 __global__ void gpu_init_mesh(bool *, int);
 __global__ void gpu_generate_mesh(bool *, int);
 __global__ void gpu_print_mesh(int);
-__global__ void gpu_initialization(double, double *);
+__global__ void gpu_initialization(const double, double *);
+__global__ void gpu_print_array(double*);
 
 // Boundary Conditions
 __device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f0, double *f, double *f1,
@@ -589,14 +590,11 @@ __global__ void gpu_print_mesh(int mode){
 }
 
 __host__ void initialization(double *r, double *u, double *v){
-	checkCudaErrors(cudaMemset(r, 0, Nx*Ny*sizeof(double)));
-	checkCudaErrors(cudaMemset(u, 0, Nx*Ny*sizeof(double)));
-	checkCudaErrors(cudaMemset(v, 0, Nx*Ny*sizeof(double)));
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
 
-	gpu_initialization<<< grid, block>>>(1.0, r);
+	gpu_initialization<<< grid, block >>>(rho0, r);
 	getLastCudaError("gpu_initialization kernel error");
 
 	gpu_initialization<<< grid, block>>>(u_max, u);
@@ -604,12 +602,32 @@ __host__ void initialization(double *r, double *u, double *v){
 
 	gpu_initialization<<< grid, block>>>(0.0, v);
 	getLastCudaError("gpu_initialization kernel error");
+
+	gpu_print_array<<< 1, 1 >>>(r);
+	getLastCudaError("gpu_print_array kernel error");
+
+	gpu_print_array<<< 1, 1>>>(u);
+	getLastCudaError("gpu_print_array kernel error");
+
+	gpu_print_array<<< 1, 1>>>(v);
+	getLastCudaError("gpu_print_array kernel error");
+
 }
 
-__global__ void gpu_initialization(double value, double *array){
+__global__ void gpu_initialization(const double value, double *array){
 
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 
 	array[gpu_scalar_index(x, y)] = value;
+}
+
+__global__ void gpu_print_array(double *array){
+
+	for(int y = 0; y < Ny_d; ++y){
+		for(int x = 0; x < Nx_d; ++x){
+			printf("%g ", array[Nx_d*y + x]);
+		}
+	printf("\n");
+	}
 }
