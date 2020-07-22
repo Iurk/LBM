@@ -9,7 +9,7 @@ cylinder:
 
 simulation:
   lattice: D2Q9
-  NSTEPS: 10
+  NSTEPS: 5
   NSAVE: 1
   NMSG: 1
   computeFlowProperties: true
