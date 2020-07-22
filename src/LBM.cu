@@ -46,7 +46,7 @@ __global__ void gpu_pop_e(int *, int);
 __global__ void gpu_init_mesh(bool *, int);
 __global__ void gpu_generate_mesh(bool *, int);
 __global__ void gpu_print_mesh(int);
-__global__ void gpu_initialization(const double, double *);
+__global__ void gpu_initialization(double, double *);
 
 // Boundary Conditions
 __device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f0, double *f, double *f1,
@@ -146,11 +146,11 @@ __device__ void gpu_bounce_back_bot(unsigned int x, unsigned int y, double *f, d
 
 __host__ void init_equilibrium(double *f0, double *f1, double *r, double *u, double *v){
 
-	//dim3 grid(Nx/nThreads, Ny, 1);
-	//dim3 block(nThreads, 1, 1);
+	dim3 grid(Nx/nThreads, Ny, 1);
+	dim3 block(nThreads, 1, 1);
 
-	dim3 grid(1, 1, 1);
-	dim3 block(1, 1, 1);
+	//dim3 grid(1, 1, 1);
+	//dim3 block(1, 1, 1);
 
 	gpu_init_equilibrium<<< grid, block >>>(f0, f1, r, u, v);
 	getLastCudaError("gpu_init_equilibrium kernel error");
@@ -184,11 +184,11 @@ __global__ void gpu_init_equilibrium(double *f0, double *f1, double *r, double *
 
 __host__ void stream_collide_save(double *f0, double *f1, double *f2, double *f0neq, double *f1neq, double *r, double *u, double *v, bool save){
 
-	//dim3 grid(Nx/nThreads, Ny, 1);
-	//dim3 block(nThreads, 1, 1);
+	dim3 grid(Nx/nThreads, Ny, 1);
+	dim3 block(nThreads, 1, 1);
 
-	dim3 grid(1,1,1);
-	dim3 block(1,1,1);
+	//dim3 grid(1,1,1);
+	//dim3 block(1,1,1);
 
 	gpu_stream_collide_save<<< grid, block >>>(f0, f1, f2, f0neq, f1neq, r, u, v, save);
 	getLastCudaError("gpu_stream_collide_save kernel error");
@@ -220,6 +220,16 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	double f[] = {ft0, ft1, ft2, ft3, ft4, ft5, ft6, ft7, ft8};
 
+	if(x == 0){
+		if(y == 0){
+			printf("Temporary\n");
+			printf("rho: %g ux: %g uy: %g\n", r[gpu_scalar_index(x, y)], u[gpu_scalar_index(x, y)], v[gpu_scalar_index(x, y)]);
+			printf("f0: %g f1: %g f2: %g\n", f[0], f[1], f[2]);
+			printf("f3: %g f4: %g f5: %g\n", f[3], f[4], f[5]);
+			printf("f6: %g f7: %g f8: %g\n", f[6], f[7], f[8]);
+		}
+	}
+
 	double rho = 0, ux_i = 0, uy_i = 0;
 
 	for(int n = 0; n < q; ++n){
@@ -233,10 +243,34 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	double ux = rhoinv*ux_i;
 	double uy = rhoinv*uy_i;
 
+	if(x == 0){
+		if(y == 0){
+			printf("rho: %g ux: %g uy: %g\n", rho, ux, uy);
+		}
+	}
+
 	if(save){
 		r[gpu_scalar_index(x, y)] = rho;
 		u[gpu_scalar_index(x, y)] = ux;
 		v[gpu_scalar_index(x, y)] = uy;
+	}
+
+	u[gpu_scalar_index(x, 0)] = 0.0;
+	v[gpu_scalar_index(x, 0)] = 0.0;
+	
+	u[gpu_scalar_index(x, 31)] = 0.0;
+	v[gpu_scalar_index(x, 31)] = 0.0;
+
+	u[gpu_scalar_index(0, y)] = 0.04;
+	v[gpu_scalar_index(0, y)] = 0.0;
+
+	u[gpu_scalar_index(31, y)] = 0.04;
+	v[gpu_scalar_index(31, y)] = 0.0;
+
+	if(x == 0){
+		if(y == 0){
+			printf("rho: %g ux: %g uy: %g\n", r[gpu_scalar_index(x, y)], u[gpu_scalar_index(x, y)], v[gpu_scalar_index(x, y)]);
+		}
 	}
 
 	double A = 1.0/(cs_d*cs_d);
@@ -288,6 +322,21 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		gpu_bounce_back(x, y, f2);
 	}
 	*/
+
+	if(y == 0){
+		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
+		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
+		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
+
+		gpu_bounce_back_bot(x, y, f2, &f2[idx_2], &f2[idx_5], &f2[idx_6]);
+	}
+	else if(y == Ny_d-1){
+		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
+		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
+		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
+
+		gpu_bounce_back_top(x, y, f2, &f2[idx_4], &f2[idx_7], &f2[idx_8]);
+	}
 }
 
 __host__ void compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop, double *prop_gpu, double *prop_host){
@@ -540,8 +589,8 @@ __global__ void gpu_print_mesh(int mode){
 }
 
 __host__ void initialization(double *r, double *u, double *v){
-	checkCudaErrors(cudaMemset(r, 1, Nx*Ny*sizeof(double)));
-	checkCudaErrors(cudaMemset(u, 0.04, Nx*Ny*sizeof(double)));
+	checkCudaErrors(cudaMemset(r, 0, Nx*Ny*sizeof(double)));
+	checkCudaErrors(cudaMemset(u, 0, Nx*Ny*sizeof(double)));
 	checkCudaErrors(cudaMemset(v, 0, Nx*Ny*sizeof(double)));
 
 	dim3 grid(Nx/nThreads, Ny, 1);
@@ -557,7 +606,7 @@ __host__ void initialization(double *r, double *u, double *v){
 	getLastCudaError("gpu_initialization kernel error");
 }
 
-__global__ void gpu_initialization(const double value, double *array){
+__global__ void gpu_initialization(double value, double *array){
 
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
