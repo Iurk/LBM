@@ -46,7 +46,7 @@ __global__ void gpu_pop_e(int *, int);
 __global__ void gpu_init_mesh(bool *, int);
 __global__ void gpu_generate_mesh(bool *, int);
 __global__ void gpu_print_mesh(int);
-__global__ void gpu_initialization(const double, double *);
+__global__ void gpu_initialization(double*, double);
 __global__ void gpu_print_array(double*);
 
 // Boundary Conditions
@@ -259,17 +259,25 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		v[gpu_scalar_index(x, y)] = uy;
 	}
 
-	u[gpu_scalar_index(x, 0)] = 0.0;
-	v[gpu_scalar_index(x, 0)] = 0.0;
+	if(y == 0){
+		u[gpu_scalar_index(x, 0)] = 0.0;
+		v[gpu_scalar_index(x, 0)] = 0.0;
+	}
 	
-	u[gpu_scalar_index(x, 31)] = 0.0;
-	v[gpu_scalar_index(x, 31)] = 0.0;
+	if(y == Ny_d-1){
+		u[gpu_scalar_index(x, 31)] = 0.0;
+		v[gpu_scalar_index(x, 31)] = 0.0;
+	}
+	
+	if(x == 0){
+		u[gpu_scalar_index(0, y)] = 0.04;
+		v[gpu_scalar_index(0, y)] = 0.0;
+	}
 
-	u[gpu_scalar_index(0, y)] = 0.04;
-	v[gpu_scalar_index(0, y)] = 0.0;
-
-	u[gpu_scalar_index(31, y)] = 0.04;
-	v[gpu_scalar_index(31, y)] = 0.0;
+	if(x == Nx_d-1){
+		u[gpu_scalar_index(31, y)] = 0.04;
+		v[gpu_scalar_index(31, y)] = 0.0;
+	}
 
 	if(x == 0){
 		if(y == 0){
@@ -592,25 +600,25 @@ __global__ void gpu_print_mesh(int mode){
 	}
 }
 
-__host__ void initialization(double *r, double *u, double *v){
+__host__ double* initialization(double *array, double value){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
 
-	gpu_initialization<<< grid, block >>>(rho0, r);
-	getLastCudaError("gpu_initialization kernel error");
-
-	gpu_print_array<<< 1, 1 >>>(r);
+	gpu_initialization<<< grid, block >>>(array, value);
 	getLastCudaError("gpu_print_array kernel error");
 
-	gpu_initialization<<< grid, block >>>(1.0, u);
-	getLastCudaError("gpu_initialization kernel error");
+	return array;
 
-	gpu_print_array<<< 1, 1 >>>(u);
-	getLastCudaError("gpu_print_array kernel error");
 }
 
-__global__ void gpu_initialization(const double value, double *array){
+__host__ void fill_array(double *array, double value, size_t mem){
+	for(size_t i = 0; i < mem; ++i){
+		array[i] = value;
+	}
+}
+
+__global__ void gpu_initialization(double *array, double value){
 
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -624,7 +632,7 @@ __global__ void gpu_print_array(double *array){
 		for(int x = 0; x < Nx_d; ++x){
 			printf("%g ", array[Nx_d*y + x]);
 		}
-	printf("\n");
+		printf("\n");
 	}
 	printf("\n");
 }
