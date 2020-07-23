@@ -223,6 +223,9 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	if(x == 0){
 		if(y == 0){
+			printf("x: %d y: %d\n", x, y);
+			double ux = u[gpu_scalar_index(x, y)];
+			printf("ux: %g\n", ux);
 			printf("Temporary\n");
 			printf("rho: %g ux: %g uy: %g\n", r[gpu_scalar_index(x, y)], u[gpu_scalar_index(x, y)], v[gpu_scalar_index(x, y)]);
 			printf("f0: %g f1: %g f2: %g\n", f[0], f[1], f[2]);
@@ -597,21 +600,14 @@ __host__ void initialization(double *r, double *u, double *v){
 	gpu_initialization<<< grid, block >>>(rho0, r);
 	getLastCudaError("gpu_initialization kernel error");
 
-	gpu_initialization<<< grid, block>>>(u_max, u);
-	getLastCudaError("gpu_initialization kernel error");
-
-	gpu_initialization<<< grid, block>>>(0.0, v);
-	getLastCudaError("gpu_initialization kernel error");
-
 	gpu_print_array<<< 1, 1 >>>(r);
 	getLastCudaError("gpu_print_array kernel error");
 
-	gpu_print_array<<< 1, 1>>>(u);
-	getLastCudaError("gpu_print_array kernel error");
+	gpu_initialization<<< grid, block >>>(1.0, u);
+	getLastCudaError("gpu_initialization kernel error");
 
-	gpu_print_array<<< 1, 1>>>(v);
+	gpu_print_array<<< 1, 1 >>>(u);
 	getLastCudaError("gpu_print_array kernel error");
-
 }
 
 __global__ void gpu_initialization(const double value, double *array){
@@ -630,4 +626,5 @@ __global__ void gpu_print_array(double *array){
 		}
 	printf("\n");
 	}
+	printf("\n");
 }
