@@ -107,9 +107,9 @@ int main(int argc, char const *argv[]){
 	fluid_gpu = generate_mesh(fluid, "fluid");
 
 	// Initialization
-	rho_gpu = initialization(rho_gpu, rho0);
-	ux_gpu = initialization(ux_gpu, u_max);
-	uy_gpu = initialization(uy_gpu, 0.0);
+	initialization(rho_gpu, rho0);
+	initialization(ux_gpu, u_max);
+	initialization(uy_gpu, 0.0);
 
 	init_equilibrium(f0_gpu, f1_gpu, rho_gpu, ux_gpu, uy_gpu);
 	checkCudaErrors(cudaMemset(f0neq_gpu, 0, mem_size_0dir));
@@ -129,7 +129,20 @@ int main(int argc, char const *argv[]){
 		bool save = (n+1)%NSAVE == 0;
 		bool msg = (n+1)%NMSG == 0;
 		bool need_scalars = save || (msg && computeFlowProperties);
+/*
+		double *ux_test;
 
+		ux_test = (double*)malloc(mem_size_scalar);
+		checkCudaErrors(cudaMemcpy(ux_test, ux_gpu, mem_size_scalar, cudaMemcpyDeviceToHost));
+
+		for(int y = 0; y < Ny; ++y){
+			std::cout << y << "-> ";
+			for(int x = 0; x < Nx; ++x){
+				std::cout << ux_test[Nx*y+x] << " ";
+			}
+			std::cout << std::endl;
+		}
+*/
 		stream_collide_save(f0_gpu, f1_gpu, f2_gpu, f0neq_gpu, f1neq_gpu, rho_gpu, ux_gpu, uy_gpu, need_scalars);
 
 		if(save){
