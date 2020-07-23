@@ -107,7 +107,9 @@ int main(int argc, char const *argv[]){
 	fluid_gpu = generate_mesh(fluid, "fluid");
 
 	// Initialization
-	initialization(rho_gpu, ux_gpu, uy_gpu);
+	rho_gpu = initialization(rho_gpu, rho0);
+	ux_gpu = initialization(ux_gpu, u_max);
+	uy_gpu = initialization(uy_gpu, 0.0);
 
 	init_equilibrium(f0_gpu, f1_gpu, rho_gpu, ux_gpu, uy_gpu);
 	checkCudaErrors(cudaMemset(f0neq_gpu, 0, mem_size_0dir));
