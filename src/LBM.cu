@@ -220,19 +220,6 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	double f[] = {ft0, ft1, ft2, ft3, ft4, ft5, ft6, ft7, ft8};
 
-	if(x == 0){
-		if(y == 0){
-			printf("x: %d y: %d\n", x, y);
-			double ux = u[gpu_scalar_index(x, y)];
-			printf("ux: %g\n", ux);
-			printf("Temporary\n");
-			printf("rho: %g ux: %g uy: %g\n", r[gpu_scalar_index(x, y)], u[gpu_scalar_index(x, y)], v[gpu_scalar_index(x, y)]);
-			printf("f0: %g f1: %g f2: %g\n", f[0], f[1], f[2]);
-			printf("f3: %g f4: %g f5: %g\n", f[3], f[4], f[5]);
-			printf("f6: %g f7: %g f8: %g\n", f[6], f[7], f[8]);
-		}
-	}
-
 	double rho = 0, ux_i = 0, uy_i = 0;
 
 	for(int n = 0; n < q; ++n){
@@ -245,12 +232,6 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	double ux = rhoinv*ux_i;
 	double uy = rhoinv*uy_i;
-
-	if(x == 0){
-		if(y == 0){
-			printf("rho: %g ux: %g uy: %g\n", rho, ux, uy);
-		}
-	}
 
 	if(save){
 		r[gpu_scalar_index(x, y)] = rho;
@@ -276,12 +257,6 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	if(x == Nx_d-1){
 		u[gpu_scalar_index(31, y)] = 0.04;
 		v[gpu_scalar_index(31, y)] = 0.0;
-	}
-
-	if(x == 0){
-		if(y == 0){
-			printf("rho: %g ux: %g uy: %g\n", r[gpu_scalar_index(x, y)], u[gpu_scalar_index(x, y)], v[gpu_scalar_index(x, y)]);
-		}
 	}
 
 	double A = 1.0/(cs_d*cs_d);
