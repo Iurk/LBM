@@ -47,7 +47,6 @@ __global__ void gpu_init_mesh(bool *, int);
 __global__ void gpu_generate_mesh(bool *, int);
 __global__ void gpu_print_mesh(int);
 __global__ void gpu_initialization(double*, double);
-__global__ void gpu_print_array(double*);
 
 // Boundary Conditions
 __device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f0, double *f, double *f1,
@@ -600,22 +599,13 @@ __global__ void gpu_print_mesh(int mode){
 	}
 }
 
-__host__ double* initialization(double *array, double value){
+__host__ void initialization(double *array, double value){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
 
 	gpu_initialization<<< grid, block >>>(array, value);
 	getLastCudaError("gpu_print_array kernel error");
-
-	return array;
-
-}
-
-__host__ void fill_array(double *array, double value, size_t mem){
-	for(size_t i = 0; i < mem; ++i){
-		array[i] = value;
-	}
 }
 
 __global__ void gpu_initialization(double *array, double value){
@@ -624,15 +614,4 @@ __global__ void gpu_initialization(double *array, double value){
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 
 	array[gpu_scalar_index(x, y)] = value;
-}
-
-__global__ void gpu_print_array(double *array){
-
-	for(int y = 0; y < Ny_d; ++y){
-		for(int x = 0; x < Nx_d; ++x){
-			printf("%g ", array[Nx_d*y + x]);
-		}
-		printf("\n");
-	}
-	printf("\n");
 }
