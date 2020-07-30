@@ -200,13 +200,13 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
-
+/*
 	if(x == 0){
 		if(y == 0){
 			printf("omega: %g\n", omega);
 		}
 	}
-
+*/
 	unsigned int xf1 = (x + 1)%Nx_d;		// Forward
 	unsigned int yf1 = (y + 1)%Ny_d;		// Forward
 	unsigned int xb1 = (Nx_d + x - 1)%Nx_d;	// Backward
