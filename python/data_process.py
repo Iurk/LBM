@@ -42,7 +42,7 @@ for var in variables:
     i = 0
     print('Getting ' + var + ' data...')
     for root, dirs, files in walk(path):
-        for file in files:
+        for file in sorted(files):
             path = root + "/%s" % file
             dic[var][i] = np.fromfile(path).reshape(Ny, Nx)
             i += 1
