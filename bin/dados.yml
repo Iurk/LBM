@@ -9,9 +9,9 @@ cylinder:
 
 simulation:
   lattice: D2Q9
-  NSTEPS: 1000
-  NSAVE: 50
-  NMSG: 50
+  NSTEPS: 10000
+  NSAVE: 100
+  NMSG: 500
   computeFlowProperties: true
   quiet: true
   meshprint: false
