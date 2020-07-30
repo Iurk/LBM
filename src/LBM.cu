@@ -46,7 +46,7 @@ __global__ void gpu_pop_e(int *, int);
 __global__ void gpu_init_mesh(bool *, int);
 __global__ void gpu_generate_mesh(bool *, int);
 __global__ void gpu_print_mesh(int);
-__global__ void gpu_initialization(const double, double *);
+__global__ void gpu_initialization(double*, double);
 
 // Boundary Conditions
 __device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f0, double *f, double *f1,
@@ -72,27 +72,30 @@ __device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f0, dou
 	*v = uy;
 }
 
-__device__ void gpu_zou_he_outlet(unsigned int x, unsigned int y, double *f0, double *f, double *f3,
-								double *f6, double *f7, double *r, double *u, double *v){
+__device__ void gpu_outflow_outlet(unsigned int x, unsigned int y, double *f0, double *f, double *fn0, double *fn1, double *fn2, double *fn3, double *fn4,
+								double *fn5, double *fn6, double *fn7, double *fn8){
 
-	double rho = 1.0;
-	double uy = 0.0;
+	int x_before = x - 1;
 
-	unsigned int idx_0 = gpu_field0_index(x, y);
-	unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
-	unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
-	unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
-	unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
-	unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
+	unsigned int idx_0 = gpu_field0_index(x_before, y);
+	unsigned int idx_1 = gpu_fieldn_index(x_before, y, 1);
+	unsigned int idx_2 = gpu_fieldn_index(x_before, y, 2);
+	unsigned int idx_3 = gpu_fieldn_index(x_before, y, 3);
+	unsigned int idx_4 = gpu_fieldn_index(x_before, y, 4);
+	unsigned int idx_5 = gpu_fieldn_index(x_before, y, 5);
+	unsigned int idx_6 = gpu_fieldn_index(x_before, y, 6);
+	unsigned int idx_7 = gpu_fieldn_index(x_before, y, 7);
+	unsigned int idx_8 = gpu_fieldn_index(x_before, y, 8);
 
-	double ux = (f0[idx_0] + f[idx_2] + f[idx_4] + 2*(f[idx_1] + f[idx_5] + f[idx_8]))/rho - 1.0;
-	*f3 = f[idx_1] - 2.0/3.0*rho*ux;
-	*f6 = f[idx_8] - 0.5*(f[idx_2] - f[idx_4]) - 1.0/6.0*rho*ux;
-	*f7 = f[idx_5] + 0.5*(f[idx_2] - f[idx_4]) - 1.0/6.0*rho*ux;
-
-	*r = rho;
-	*u = ux;
-	*v = uy;
+	*fn0 = f0[idx_0];
+	*fn1 = f[idx_1];
+	*fn2 = f[idx_2];
+	*fn3 = f[idx_3];
+	*fn4 = f[idx_4];
+	*fn5 = f[idx_5];
+	*fn6 = f[idx_6];
+	*fn7 = f[idx_7];
+	*fn8 = f[idx_8];
 }
 
 __device__ void gpu_noslip(unsigned int x, unsigned int y, double *f2){
@@ -146,11 +149,11 @@ __device__ void gpu_bounce_back_bot(unsigned int x, unsigned int y, double *f, d
 
 __host__ void init_equilibrium(double *f0, double *f1, double *r, double *u, double *v){
 
-	//dim3 grid(Nx/nThreads, Ny, 1);
-	//dim3 block(nThreads, 1, 1);
+	dim3 grid(Nx/nThreads, Ny, 1);
+	dim3 block(nThreads, 1, 1);
 
-	dim3 grid(1, 1, 1);
-	dim3 block(1, 1, 1);
+	//dim3 grid(1, 1, 1);
+	//dim3 block(1, 1, 1);
 
 	gpu_init_equilibrium<<< grid, block >>>(f0, f1, r, u, v);
 	getLastCudaError("gpu_init_equilibrium kernel error");
@@ -184,11 +187,11 @@ __global__ void gpu_init_equilibrium(double *f0, double *f1, double *r, double *
 
 __host__ void stream_collide_save(double *f0, double *f1, double *f2, double *f0neq, double *f1neq, double *r, double *u, double *v, bool save){
 
-	//dim3 grid(Nx/nThreads, Ny, 1);
-	//dim3 block(nThreads, 1, 1);
+	dim3 grid(Nx/nThreads, Ny, 1);
+	dim3 block(nThreads, 1, 1);
 
-	dim3 grid(1,1,1);
-	dim3 block(1,1,1);
+	//dim3 grid(1,1,1);
+	//dim3 block(1,1,1);
 
 	gpu_stream_collide_save<<< grid, block >>>(f0, f1, f2, f0neq, f1neq, r, u, v, save);
 	getLastCudaError("gpu_stream_collide_save kernel error");
@@ -196,8 +199,7 @@ __host__ void stream_collide_save(double *f0, double *f1, double *f2, double *f0
 
 __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, double *f0neq, double *f1neq, double *r, double *u, double *v, bool save){
 
-	const double tauinv = 1.0/tau_d;
-	const double omega = 1.0 - tauinv;     
+	const double omega = 1.0/tau_d;
 
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -229,7 +231,6 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		uy_i += f[n]*ey_d[n];
 	}
 
-
 	double rhoinv = 1.0/rho;
 
 	double ux = rhoinv*ux_i;
@@ -240,16 +241,13 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		u[gpu_scalar_index(x, y)] = ux;
 		v[gpu_scalar_index(x, y)] = uy;
 	}
-
+	
 	double A = 1.0/(cs_d*cs_d);
 	double B = 1.0/(2.0*cs_d*cs_d);
 
 	double w0r = w0_d*rho;
 	double wsr = ws_d*rho;
 	double wdr = wd_d*rho;
-
-	double tw0r = tauinv*w0_d*rho; 
-	double twsr = tauinv*ws_d*rho; 
 
 	double W[] = {w0_d, ws_d, ws_d, ws_d, ws_d, wd_d, wd_d, wd_d, wd_d};
 	double Wrho[] = {w0r, wsr, wsr, wsr, wsr, wdr, wdr, wdr, wdr};
@@ -260,7 +258,8 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	f0neq[gpu_field0_index(x, y)] = f[0] - Wrho[0]*omusq;
 	for(int n = 1; n < q; ++n){
 		double eidotu = ux*ex_d[n] + uy*ey_d[n];
-		f1neq[gpu_fieldn_index(x, y, n)] = f[n] - Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
+		double feq = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
+		f1neq[gpu_fieldn_index(x, y, n)] = f[n] - feq;
 	}
 
 	// Calculating the Viscous stress tensor
@@ -271,12 +270,13 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		tauyy += f1neq[gpu_fieldn_index(x, y, n)]*ey_d[n]*ey_d[n];
 	}
 
-	f0[gpu_field0_index(x, y)] = omega*f0neq[gpu_field0_index(x, y)] + Wrho[0]*(omusq);
+	f0[gpu_field0_index(x, y)] = (1.0 - omega)*f0neq[gpu_field0_index(x, y)] + Wrho[0]*(omusq);
 
 	for(int n = 1; n < q; ++n){
 		f1neq[gpu_fieldn_index(x, y, n)] = B*W[n]*(tauxx*(A*ex_d[n] - 1.0) + 2.0*tauxy*A*ex_d[n]*ey_d[n] + tauyy*(A*ey_d[n] - 1.0));
 		double eidotu = ux*ex_d[n] + uy*ey_d[n];
-		f2[gpu_fieldn_index(x, y, n)] = omega*f1neq[gpu_fieldn_index(x, y, n)] + Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
+		double feq = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
+		f2[gpu_fieldn_index(x, y, n)] = (1.0 - omega)*f1neq[gpu_fieldn_index(x, y, n)] + feq;
 	}
 
 	bool node_solid = cylinder_d[gpu_scalar_index(x, y)];
@@ -292,7 +292,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	}
 	*/
 
-	int sidx = gpu_scalar_index(x, y);
+	unsigned int idx_s = gpu_scalar_index(x, y);
 
 	if(y == 0){
 		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
@@ -301,8 +301,8 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 		gpu_bounce_back_bot(x, y, f2, &f2[idx_2], &f2[idx_5], &f2[idx_6]);
 	}
-
-	if(y == Ny_d){
+	
+	if(y == Ny_d-1){
 		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
 		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
 		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
@@ -315,15 +315,21 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
 		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
-		gpu_zou_he_inlet(x, y, f0, f2, &f2[idx_1], &f2[idx_5], &f2[idx_8], &r[sidx], &u[sidx], &v[sidx]);
+		gpu_zou_he_inlet(x, y, f0, f2, &f2[idx_1], &f2[idx_5], &f2[idx_8], &r[idx_s], &u[idx_s], &v[idx_s]);
 	}
 
-	if(x == Nx_d){
+	if(x == Nx_d-1){
+		unsigned int idx_0 = gpu_field0_index(x, y);
+		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
+		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
 		unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
+		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
+		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
 		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
 		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
+		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
-		gpu_zou_he_outlet(x, y, f0, f2, &f2[idx_3], &f2[idx_6], &f2[idx_7], &r[sidx], &u[sidx], &v[sidx]);
+		gpu_outflow_outlet(x, y, f0, f2, &f0[idx_0], &f2[idx_1], &f2[idx_2], &f2[idx_3], &f2[idx_4], &f2[idx_5], &f2[idx_6], &f2[idx_7], &f2[idx_8]);
 	}
 }
 
@@ -576,25 +582,16 @@ __global__ void gpu_print_mesh(int mode){
 	}
 }
 
-__host__ void initialization(double *r, double *u, double *v){
-	checkCudaErrors(cudaMemset(r, 1, Nx*Ny*sizeof(double)));
-	checkCudaErrors(cudaMemset(u, 0.04, Nx*Ny*sizeof(double)));
-	checkCudaErrors(cudaMemset(v, 0, Nx*Ny*sizeof(double)));
+__host__ void initialization(double *array, double value){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
 
-	gpu_initialization<<< grid, block>>>(1.0, r);
-	getLastCudaError("gpu_initialization kernel error");
-
-	gpu_initialization<<< grid, block>>>(u_max, u);
-	getLastCudaError("gpu_initialization kernel error");
-
-	gpu_initialization<<< grid, block>>>(0.0, v);
-	getLastCudaError("gpu_initialization kernel error");
+	gpu_initialization<<< grid, block >>>(array, value);
+	getLastCudaError("gpu_print_array kernel error");
 }
 
-__global__ void gpu_initialization(const double value, double *array){
+__global__ void gpu_initialization(double *array, double value){
 
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
