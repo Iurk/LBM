@@ -3,17 +3,17 @@
 #include <iostream>
 #include <vector>
 
-void initialization(double *, double);
-void init_equilibrium(double *, double *, double *, double *, double *);
-void stream_collide_save(double *, double *, double *, double *, double *, double *, double *, double *, bool);
-void compute_flow_properties(unsigned int, double *, double *, double *, double *, double *, double *);
-void report_flow_properties(unsigned int, double *, double *, double *, double *, double *);
-void save_scalar(const char* , double *, double *, unsigned int);
-void wrapper_input(unsigned int *, unsigned int *, double *, double *, double *, const double *);
-void wrapper_lattice(unsigned int *, double *, double *, double *, double *);
-int* generate_e(int *, std::string);
-bool* generate_mesh(bool *, std::string);
-void fill_array(double *, double , size_t);
+void initialization(double*, double);
+void init_equilibrium(double*, double*, double*, double*, double*);
+void stream_collide_save(double*, double*, double*, double*, double*, double*, double*, double*, bool);
+void compute_flow_properties(unsigned int, double*, double*, double*, double*, double*, double*);
+void report_flow_properties(unsigned int, double*, double*, double*, double*, double*);
+void save_scalar(const char* , double*, double*, unsigned int);
+void wrapper_input(unsigned int*, unsigned int*, double*, double*, double*, const double*);
+void wrapper_lattice(unsigned int*, double*, double*, double*, double*);
+int* generate_e(int*, std::string);
+bool* generate_mesh(bool*, std::string);
+void fill_array(double*, double , size_t);
 
 #define checkCudaErrors(err) __checkCudaErrors(err, #err, __FILE__, __LINE__)
 #define getLastCudaError(msg) __getLastCudaError(msg, __FILE__, __LINE__)

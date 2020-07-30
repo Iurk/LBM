@@ -39,12 +39,12 @@ __device__ __forceinline__ size_t gpu_fieldn_index(unsigned int x, unsigned int 
 }
 
 __global__ void gpu_init_equilibrium(double*, double*, double*, double*, double*);
-__global__ void gpu_stream_collide_save(double *, double *, double*, double*, double*, double*, double*, double*, bool);
+__global__ void gpu_stream_collide_save(double*, double*, double*, double*, double*, double*, double*, double*, bool);
 __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, double*, double*);
-__global__ void gpu_init_e(int *, int);
-__global__ void gpu_pop_e(int *, int);
-__global__ void gpu_init_mesh(bool *, int);
-__global__ void gpu_generate_mesh(bool *, int);
+__global__ void gpu_init_e(int*, int);
+__global__ void gpu_pop_e(int*, int);
+__global__ void gpu_init_mesh(bool*, int);
+__global__ void gpu_generate_mesh(bool*, int);
 __global__ void gpu_print_mesh(int);
 __global__ void gpu_initialization(double*, double);
 
@@ -201,6 +201,12 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 
+	if(x == 0){
+		if(y == 0){
+			printf("omega: %g\n", omega);
+		}
+	}
+
 	unsigned int xf1 = (x + 1)%Nx_d;		// Forward
 	unsigned int yf1 = (y + 1)%Ny_d;		// Forward
 	unsigned int xb1 = (Nx_d + x - 1)%Nx_d;	// Backward
@@ -279,7 +285,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	bool node_solid = cylinder_d[gpu_scalar_index(x, y)];
 	bool node_fluid = fluid_d[gpu_scalar_index(x, y)];
 
-	/*
+/*
 	if (node_solid){
 		gpu_noslip(x, y, f2);
 	}
