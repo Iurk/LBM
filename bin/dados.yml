@@ -1,17 +1,17 @@
 domain:
   Nx: 1024
-  Ny: 512
+  Ny: 1024
 
 cylinder:
   Cx: Nx/4
   Cy: Ny/2
-  D: 128
+  D: 80
 
 simulation:
   lattice: D2Q9
-  NSTEPS: 10000
-  NSAVE: 100
-  NMSG: 500
+  NSTEPS: 10
+  NSAVE: 1
+  NMSG: 1
   computeFlowProperties: true
   quiet: true
   meshprint: false
@@ -20,7 +20,7 @@ gpu:
   nThreads: 32
 
 input:
-  Re: 150
+  Re: 80
   u_max: 0.04
   rho0: 1.0
 
