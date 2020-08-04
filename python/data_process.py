@@ -29,7 +29,7 @@ digitos = len(str(Steps))
 
 idx_files = ["%0{}d".format(digitos) % i for i in range(0, Steps+Saves, Saves)]
 
-variables = ["rho", "ux", "uy"]
+variables = ["ux", "uy"]
 results = "./bin/Results/"
 
 rho = np.empty((len(idx_files), Ny, Nx))
