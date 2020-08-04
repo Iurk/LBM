@@ -63,7 +63,7 @@ namespace myGlobals{
 	const size_t mem_size_scalar = sizeof(double)*Nx*Ny;
 
 	// Nu and Tau
-	double nu = (u_max*128)/Re;
+	double nu = 1.0/6.0;//(u_max*128)/Re;
 	const double tau = nu/(cs*cs) + 0.5;
 
 	bool *cylinder = read_bin(solid_mesh);
