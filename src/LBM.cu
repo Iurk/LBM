@@ -337,13 +337,13 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	if (node_solid){
 		gpu_noslip(x, y, f2);
 	}
-
+*/
 	if (node_fluid){
 		gpu_bounce_back(x, y, f2);
 	}
-*/
-	unsigned int idx_s = gpu_scalar_index(x, y);
 
+	unsigned int idx_s = gpu_scalar_index(x, y);
+/*
 	if(y == 0){
 		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
 		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
@@ -359,7 +359,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 		gpu_bounce_back_top(x, y, f2, &f2[idx_4], &f2[idx_7], &f2[idx_8]);
 	}
-
+*/
 	if(x == 0){
 		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
 		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
