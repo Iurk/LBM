@@ -1,11 +1,9 @@
 domain:
-  Nx: 1024
-  Ny: 512
-
-cylinder:
+  Nx: 2048
+  Ny: 1024
   Cx: Nx/4
   Cy: Ny/2
-  D: 4
+  D: 64
 
 simulation:
   lattice: D2Q9
@@ -20,7 +18,7 @@ gpu:
   nThreads: 32
 
 input:
-  Re: 200
+  Re: 10
   u_max: 0.04
   rho0: 1.0
 
