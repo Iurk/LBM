@@ -23,6 +23,7 @@ namespace myGlobals{
 	//Domain
 	unsigned int Nx = domain["Nx"].as<int>();
 	unsigned int Ny = domain["Ny"].as<int>();
+	unsigned int D = domain["D"].as<int>();
 
 	//Simulation
 	unsigned int NSTEPS = simulation["NSTEPS"].as<int>();
@@ -63,7 +64,7 @@ namespace myGlobals{
 	const size_t mem_size_scalar = sizeof(double)*Nx*Ny;
 
 	// Nu and Tau
-	double nu = (u_max*Nx)/Re;
+	double nu = (u_max*D)/Re;
 	const double tau = nu/(cs*cs) + 0.5;
 
 	bool *cylinder = read_bin(solid_mesh);
