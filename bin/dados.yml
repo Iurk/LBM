@@ -1,5 +1,5 @@
 domain:
-  Nx: 512
+  Nx: 1024
   Ny: 512
 
 cylinder:
@@ -20,7 +20,7 @@ gpu:
   nThreads: 32
 
 input:
-  Re: 80
+  Re: 200
   u_max: 0.04
   rho0: 1.0
 
