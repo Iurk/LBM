@@ -3,7 +3,7 @@ domain:
   Ny: 512
   Cx: Nx/4
   Cy: Ny/2
-  D: 42
+  D: 64
 
 simulation:
   lattice: D2Q9
@@ -18,7 +18,7 @@ gpu:
   nThreads: 32
 
 input:
-  Re: 10
+  Re: 15
   u_max: 0.04
   rho0: 1.0
 
