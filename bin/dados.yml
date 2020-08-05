@@ -1,9 +1,9 @@
 domain:
-  Nx: 2048
-  Ny: 1024
+  Nx: 1024
+  Ny: 512
   Cx: Nx/4
   Cy: Ny/2
-  D: 64
+  D: 42
 
 simulation:
   lattice: D2Q9
