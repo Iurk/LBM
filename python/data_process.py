@@ -29,38 +29,42 @@ digitos = len(str(Steps))
 
 idx_files = ["%0{}d".format(digitos) % i for i in range(0, Steps+Saves, Saves)]
 
-variables = ["ux", "uy"]
+variables = ["rho", "ux", "uy"]
 results = "./bin/Results/"
 
-rho = np.empty((len(idx_files), Ny, Nx))
-ux = np.empty_like(rho)
-uy = np.empty_like(rho)
-dic = {"rho": rho, "ux":ux, "uy":uy}
+rho_files = []
+ux_files = []
+uy_files = []
+dic = {"rho": rho_files, "ux":ux_files, "uy":uy_files}
 
 for var in variables:
     path = results + var
-    i = 0
-    print('Getting ' + var + ' data...')
+    
     for root, dirs, files in walk(path):
         for file in sorted(files):
-            path = root + "/%s" % file
-            dic[var][i] = np.fromfile(path).reshape(Ny, Nx)
-            i += 1
+            path_full = path + "/%s" % file
+            dic[var].append(path_full)
     
-u_mod = np.sqrt(ux**2 + uy**2)
-
 pasta_img = util.criar_pasta('Images', folder=velocity, main_root=main)
 pasta_stream = util.criar_pasta('Stream', folder=velocity, main_root=main)
 
-print('Generating images...')
-for i in range(len(idx_files)):
-    fg.grafico(u_mod[i], idx_files[i], pasta_img)
-    
-print('Generating stream plots...')
 x = np.arange(1, Nx+1, 1)
 y = np.arange(1, Ny+1, 1)
+
+rho = np.empty((Ny, Nx))
+ux = np.empty_like(rho)
+uy = np.empty_like(rho)
+
+print("Plotting...")
 for i in range(len(idx_files)):
-    fg.stream(x, y, ux[i], uy[i], u_mod[i], idx_files[i], pasta_stream)
+    rho = np.fromfile(rho_files[i]).reshape(Ny, Nx)
+    ux = np.fromfile(ux_files[i]).reshape(Ny, Nx)
+    uy = np.fromfile(uy_files[i]).reshape(Ny, Nx)
+    
+    u_mod = np.sqrt(ux**2 + uy**2)
+    
+    fg.grafico(u_mod, idx_files[i], pasta_img)
+    fg.stream(x, y, ux, uy, u_mod, idx_files[i], pasta_stream)
 
 print('Animating...')
 fg.animation('Velocidade', './', pasta_img)
