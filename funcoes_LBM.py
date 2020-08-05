@@ -123,7 +123,7 @@ def tauab(Nx, Ny, e, n, fneq):
     
 # Etapa de Colisão
 def collision_step(feq, fneq, omega):  #feq, fneq, omega
-    fout = feq +(1 - omega)*fneq
+    fout = feq + (1 - omega)*fneq
 #    fout = omega*feq + (1 - omega)*f
     return fout
 

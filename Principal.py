@@ -26,9 +26,9 @@ Ny = 512    # Número de partículas em y [Lattice units]
 
 Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = 128    # Diâmetro do Cilindro [Lattice units]
+D_est = 32    # Diâmetro do Cilindro [Lattice units]
 
-Reynolds = [150]    # Reynolds Numbers
+Reynolds = [15]    # Reynolds Numbers
 cl_Re = []
 cd_Re = []
 
