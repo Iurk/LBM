@@ -200,29 +200,23 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
-/*
-	if(x == 0){
-		if(y == 0){
-			printf("omega: %g\n", omega);
-		}
-	}
-*/
-	unsigned int xf1 = (x + 1)%Nx_d;		// Forward
-	unsigned int yf1 = (y + 1)%Ny_d;		// Forward
-	unsigned int xb1 = (Nx_d + x - 1)%Nx_d;	// Backward
-	unsigned int yb1 = (Ny_d + y - 1)%Ny_d; // Backward
+
+	unsigned int xf = (x + 1)%Nx_d;		// Forward
+	unsigned int yf = (y + 1)%Ny_d;		// Forward
+	unsigned int xb = (Nx_d + x - 1)%Nx_d;	// Backward
+	unsigned int yb = (Ny_d + y - 1)%Ny_d; // Backward
 
 	double ft0 = f0[gpu_field0_index(x, y)];
 
 	// Streaming step
-	double ft1 = f1[gpu_fieldn_index(xb1, y, 1)];
-	double ft2 = f1[gpu_fieldn_index(x, yb1, 2)];
-	double ft3 = f1[gpu_fieldn_index(xf1, y, 3)];
-	double ft4 = f1[gpu_fieldn_index(x, yf1, 4)];
-	double ft5 = f1[gpu_fieldn_index(xb1, yb1, 5)];
-	double ft6 = f1[gpu_fieldn_index(xf1, yb1, 6)];
-	double ft7 = f1[gpu_fieldn_index(xf1, yf1, 7)];
-	double ft8 = f1[gpu_fieldn_index(xb1, yf1, 8)];
+	double ft1 = f1[gpu_fieldn_index(xb, y, 1)];
+	double ft2 = f1[gpu_fieldn_index(x, yb, 2)];
+	double ft3 = f1[gpu_fieldn_index(xf, y, 3)];
+	double ft4 = f1[gpu_fieldn_index(x, yf, 4)];
+	double ft5 = f1[gpu_fieldn_index(xb, yb, 5)];
+	double ft6 = f1[gpu_fieldn_index(xf, yb, 6)];
+	double ft7 = f1[gpu_fieldn_index(xf, yf, 7)];
+	double ft8 = f1[gpu_fieldn_index(xb, yf, 8)];
 
 	double f[] = {ft0, ft1, ft2, ft3, ft4, ft5, ft6, ft7, ft8};
 
@@ -244,7 +238,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		u[gpu_scalar_index(x, y)] = ux;
 		v[gpu_scalar_index(x, y)] = uy;
 	}
-	
+
 	double A = 1.0/(cs_d*cs_d);
 	double B = 1.0/(2.0*cs_d*cs_d);
 
@@ -276,7 +270,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	f0[gpu_field0_index(x, y)] = (1.0 - omega)*f0neq[gpu_field0_index(x, y)] + Wrho[0]*(omusq);
 
 	for(int n = 1; n < q; ++n){
-		f1neq[gpu_fieldn_index(x, y, n)] = B*W[n]*(tauxx*(A*ex_d[n] - 1.0) + 2.0*tauxy*A*ex_d[n]*ey_d[n] + tauyy*(A*ey_d[n] - 1.0));
+		f1neq[gpu_fieldn_index(x, y, n)] = B*W[n]*(tauxx*(A*ex_d[n]*ex_d[n] - 1.0) + 2.0*tauxy*A*ex_d[n]*ey_d[n] + tauyy*(A*ey_d[n]*ey_d[n] - 1.0));
 		double eidotu = ux*ex_d[n] + uy*ey_d[n];
 		double feq = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
 		f2[gpu_fieldn_index(x, y, n)] = (1.0 - omega)*f1neq[gpu_fieldn_index(x, y, n)] + feq;

@@ -42,9 +42,9 @@ lattices = yaml.load(lattices_data, Loader=yaml.FullLoader)
 Nx = simulation['domain']['Nx']
 Ny = simulation['domain']['Ny']
 
-Cx = simulation['cylinder']['Cx']
-Cy = simulation['cylinder']['Cy']
-D = simulation['cylinder']['D']
+Cx = simulation['domain']['Cx']
+Cy = simulation['domain']['Cy']
+D = simulation['domain']['D']
 
 lattice = simulation['simulation']['lattice']
 
