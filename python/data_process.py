@@ -10,9 +10,11 @@ import numpy as np
 from os import walk
 import utilidades as util
 import funcoes_graficos as fg
+import time
 
-main = "./bin"
-fileyaml = "./bin/dados.yml"
+ini = time.time()
+main = "../bin"
+fileyaml = "../bin/dados.yml"
 velocity = "Velocity"
 
 
@@ -30,7 +32,7 @@ digitos = len(str(Steps))
 idx_files = ["%0{}d".format(digitos) % i for i in range(0, Steps+Saves, Saves)]
 
 variables = ["rho", "ux", "uy"]
-results = "./bin/Results/"
+results = "../bin/Results/"
 
 rho_files = []
 ux_files = []
@@ -57,16 +59,23 @@ uy = np.empty_like(rho)
 
 print("Plotting...")
 for i in range(len(idx_files)):
+    start = time.time()
     rho = np.fromfile(rho_files[i]).reshape(Ny, Nx)
     ux = np.fromfile(ux_files[i]).reshape(Ny, Nx)
     uy = np.fromfile(uy_files[i]).reshape(Ny, Nx)
     
+    # print("Time Reading: {}".format(time.time() - start))
     u_mod = np.sqrt(ux**2 + uy**2)
     
+    start = time.time()
     fg.grafico(u_mod, idx_files[i], pasta_img)
+    # print("Time plotting: {}".format(time.time() - start))
     fg.stream(x, y, ux, uy, u_mod, idx_files[i], pasta_stream)
+    # print(i)
 
 print('Animating...')
 fg.animation('Velocidade', './', pasta_img)
-fg.animation('Stream', './', pasta_stream)
+# fg.animation('Stream', './', pasta_stream)
 print('Done!')
+fim = time.time()
+print("Finish in {} s".format(fim - ini))
