@@ -270,7 +270,7 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	f0[gpu_field0_index(x, y)] = (1.0 - omega)*f0neq[gpu_field0_index(x, y)] + Wrho[0]*(omusq);
 
 	for(int n = 1; n < q; ++n){
-		f1neq[gpu_fieldn_index(x, y, n)] = B*W[n]*(tauxx*(A*ex_d[n] - 1.0) + 2.0*tauxy*A*ex_d[n]*ey_d[n] + tauyy*(A*ey_d[n] - 1.0));
+		f1neq[gpu_fieldn_index(x, y, n)] = B*W[n]*(tauxx*(A*ex_d[n]*ex_d[n] - 1.0) + 2.0*tauxy*A*ex_d[n]*ey_d[n] + tauyy*(A*ey_d[n]*ey_d[n] - 1.0));
 		double eidotu = ux*ex_d[n] + uy*ey_d[n];
 		double feq = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
 		f2[gpu_fieldn_index(x, y, n)] = (1.0 - omega)*f1neq[gpu_fieldn_index(x, y, n)] + feq;
