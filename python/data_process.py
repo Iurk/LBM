@@ -9,14 +9,14 @@ import yaml
 import numpy as np
 from os import walk
 import utilidades as util
+import multiprocessing as mp
 import funcoes_graficos as fg
-import time
+from time import time
 
-ini = time.time()
-main = "../bin"
-fileyaml = "../bin/dados.yml"
+ini = time()
+main = "./bin"
+fileyaml = "./bin/dados.yml"
 velocity = "Velocity"
-
 
 datafile = open(fileyaml)
 data = yaml.load(datafile, Loader=yaml.FullLoader)
@@ -31,51 +31,42 @@ digitos = len(str(Steps))
 
 idx_files = ["%0{}d".format(digitos) % i for i in range(0, Steps+Saves, Saves)]
 
-variables = ["rho", "ux", "uy"]
-results = "../bin/Results/"
+results = "./bin/Results/"
+pasta_img = util.criar_pasta('Images', folder=velocity, main_root=main)
+# pasta_stream = util.criar_pasta('Stream', folder=velocity, main_root=main)
 
 rho_files = []
 ux_files = []
 uy_files = []
 dic = {"rho": rho_files, "ux":ux_files, "uy":uy_files}
 
-for var in variables:
+for var in dic.keys():
     path = results + var
     
     for root, dirs, files in walk(path):
         for file in sorted(files):
             path_full = path + "/%s" % file
             dic[var].append(path_full)
-    
-pasta_img = util.criar_pasta('Images', folder=velocity, main_root=main)
-pasta_stream = util.criar_pasta('Stream', folder=velocity, main_root=main)
-
+            
 x = np.arange(1, Nx+1, 1)
 y = np.arange(1, Ny+1, 1)
 
-rho = np.empty((Ny, Nx))
-ux = np.empty_like(rho)
-uy = np.empty_like(rho)
-
 print("Plotting...")
 for i in range(len(idx_files)):
-    start = time.time()
-    rho = np.fromfile(rho_files[i]).reshape(Ny, Nx)
-    ux = np.fromfile(ux_files[i]).reshape(Ny, Nx)
-    uy = np.fromfile(uy_files[i]).reshape(Ny, Nx)
+    rho = np.memmap(rho_files[i], dtype='float64', shape=(Ny, Nx))
+    ux = np.memmap(ux_files[i], dtype='float64', shape=(Ny, Nx))
+    uy = np.memmap(uy_files[i], dtype='float64', shape=(Ny, Nx))
     
-    # print("Time Reading: {}".format(time.time() - start))
     u_mod = np.sqrt(ux**2 + uy**2)
     
-    start = time.time()
     fg.grafico(u_mod, idx_files[i], pasta_img)
-    # print("Time plotting: {}".format(time.time() - start))
-    fg.stream(x, y, ux, uy, u_mod, idx_files[i], pasta_stream)
-    # print(i)
+    # fg.stream(x, y, ux, uy, u_mod, idx_files[i], pasta_stream)
+    
+    
 
 print('Animating...')
 fg.animation('Velocidade', './', pasta_img)
 # fg.animation('Stream', './', pasta_stream)
 print('Done!')
-fim = time.time()
+fim = time()
 print("Finish in {} s".format(fim - ini))
