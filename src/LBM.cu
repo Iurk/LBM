@@ -1,4 +1,8 @@
 #include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <string>
+
 #define _USE_MATH_DEFINES
 #include <math.h>
 
@@ -389,39 +393,39 @@ __host__ void report_flow_properties(unsigned int t, double *rho, double *ux, do
 	printf("%u, %g\n", t, prop[0]);
 }
 
-__host__ void save_scalar(const char* name, double *scalar_gpu, double *scalar_host, unsigned int n){
+__host__ void save_scalar(const std::string name, double *scalar_gpu, double *scalar_host, unsigned int n){
 
-	char filename[128], path[128];
-	char format[512];
+	std::ostringstream path, filename;
+
+	std::string ext = ".bin";
 
 	int ndigits = floor(log10((double)NSTEPS) + 1.0);
 
 	// Criar verificação da pasta Results
+	path << folder << name << "/";
+	const char* path_c = strdup(path.str().c_str());
 
-	sprintf(format, "%s/%%s/", folder);
-	sprintf(path, format, name);
-
-	DIR *dir = opendir(path);
+	DIR *dir = opendir(path_c);
 	if(ENOENT == errno){
-		mkdir(path, ACCESSPERMS);
+		mkdir(path_c, ACCESSPERMS);
 	}
 
-	sprintf(format, "%s%%s%%0%dd.bin", path, ndigits);
-	sprintf(filename, format, name, n);
+	filename << path.str() << name << std::setfill('0') << std::setw(ndigits) << n << ext;
+	const char* filename_c = strdup(filename.str().c_str());
 
 	checkCudaErrors(cudaMemcpy(scalar_host, scalar_gpu, mem_size_scalar, cudaMemcpyDeviceToHost));
 
-	FILE* fout = fopen(filename, "wb+");
+	FILE* fout = fopen(filename_c, "wb+");
 
 	fwrite(scalar_host, 1, mem_size_scalar, fout);
 
 	if(ferror(fout)){
-		fprintf(stderr, "Error saving to %s\n", filename);
+		fprintf(stderr, "Error saving to %s\n", filename_c);
 		perror("");
 	}
 	else{
 		if(!quiet){
-			printf("Saved to %s\n", filename);
+			printf("Saved to %s\n", filename_c);
 		}
 	}
 	fclose(fout);
