@@ -2,6 +2,6 @@
 #define __UTIL_H
 
 double equation_parser(const std::string);
-bool* read_bin(const char *);
+bool* read_bin(const std::string);
 
 #endif
