@@ -118,7 +118,6 @@ int main(int argc, char const *argv[]){
 	save_scalar("rho",rho_gpu, scalar_host, 0);
 	save_scalar("ux", ux_gpu, scalar_host, 0);
 	save_scalar("uy", uy_gpu, scalar_host, 0);
-
 	
 	// Simulation Start
 	double begin = seconds();

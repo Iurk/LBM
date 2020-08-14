@@ -49,7 +49,7 @@ INCDIRS = $(addprefix -I, $(INCDIR))
 LIBDIRS = $(addprefix -L, $(LIBDIR))
 LIB := $(addprefix -l, $(LIBRARY))
 CXXFLAGS := -std=c++11
-NVCCARCHFLAG :=-arch $(ARCH)
+NVCCARCHFLAG := -arch $(ARCH)
 NVCCFLAGS := -v --ptxas-options=-v -O3 --device-c # Para debug flag -g -G e executar com cuda-memcheck ./lbm |more
 DEPFLAGS := -MMD
 

@@ -16,7 +16,7 @@ double equation_parser(const std::string equation){
 	return result;
 }
 
-bool* read_bin(const char *mesh_path){
+bool* read_bin(const std::string mesh_path){
 
 	std::ifstream file(mesh_path);
 
