@@ -76,20 +76,18 @@ __device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f0, dou
 	*v = uy;
 }
 
-__device__ void gpu_outflow_outlet(unsigned int x, unsigned int y, double *f0, double *f, double *fn0, double *fn1, double *fn2, double *fn3, double *fn4,
+__device__ void gpu_outflow(unsigned int x_before, unsigned int y_before, double *f0, double *f, double *fn0, double *fn1, double *fn2, double *fn3, double *fn4,
 								double *fn5, double *fn6, double *fn7, double *fn8){
 
-	int x_before = x - 1;
-
-	unsigned int idx_0 = gpu_field0_index(x_before, y);
-	unsigned int idx_1 = gpu_fieldn_index(x_before, y, 1);
-	unsigned int idx_2 = gpu_fieldn_index(x_before, y, 2);
-	unsigned int idx_3 = gpu_fieldn_index(x_before, y, 3);
-	unsigned int idx_4 = gpu_fieldn_index(x_before, y, 4);
-	unsigned int idx_5 = gpu_fieldn_index(x_before, y, 5);
-	unsigned int idx_6 = gpu_fieldn_index(x_before, y, 6);
-	unsigned int idx_7 = gpu_fieldn_index(x_before, y, 7);
-	unsigned int idx_8 = gpu_fieldn_index(x_before, y, 8);
+	unsigned int idx_0 = gpu_field0_index(x_before, y_before);
+	unsigned int idx_1 = gpu_fieldn_index(x_before, y_before, 1);
+	unsigned int idx_2 = gpu_fieldn_index(x_before, y_before, 2);
+	unsigned int idx_3 = gpu_fieldn_index(x_before, y_before, 3);
+	unsigned int idx_4 = gpu_fieldn_index(x_before, y_before, 4);
+	unsigned int idx_5 = gpu_fieldn_index(x_before, y_before, 5);
+	unsigned int idx_6 = gpu_fieldn_index(x_before, y_before, 6);
+	unsigned int idx_7 = gpu_fieldn_index(x_before, y_before, 7);
+	unsigned int idx_8 = gpu_fieldn_index(x_before, y_before, 8);
 
 	*fn0 = f0[idx_0];
 	*fn1 = f[idx_1];
@@ -280,36 +278,14 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		f2[gpu_fieldn_index(x, y, n)] = (1.0 - omega)*f1neq[gpu_fieldn_index(x, y, n)] + feq;
 	}
 
-	bool node_solid = cylinder_d[gpu_scalar_index(x, y)];
 	bool node_fluid = fluid_d[gpu_scalar_index(x, y)];
 
-/*
-	if (node_solid){
-		gpu_noslip(x, y, f2);
-	}
-*/
 	if (node_fluid){
 		gpu_bounce_back(x, y, f2);
 	}
 
 	unsigned int idx_s = gpu_scalar_index(x, y);
-/*
-	if(y == 0){
-		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
-		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
-		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
 
-		gpu_bounce_back_bot(x, y, f2, &f2[idx_2], &f2[idx_5], &f2[idx_6]);
-	}
-
-	if(y == Ny_d-1){
-		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
-		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
-		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
-
-		gpu_bounce_back_top(x, y, f2, &f2[idx_4], &f2[idx_7], &f2[idx_8]);
-	}
-*/
 	if(x == 0){
 		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
 		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
@@ -329,7 +305,41 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
 		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
-		gpu_outflow_outlet(x, y, f0, f2, &f0[idx_0], &f2[idx_1], &f2[idx_2], &f2[idx_3], &f2[idx_4], &f2[idx_5], &f2[idx_6], &f2[idx_7], &f2[idx_8]);
+		int x_before = x - 1;
+
+		gpu_outflow(x_before, y, f0, f2, &f0[idx_0], &f2[idx_1], &f2[idx_2], &f2[idx_3], &f2[idx_4], &f2[idx_5], &f2[idx_6], &f2[idx_7], &f2[idx_8]);
+	}
+
+	if(y == 0){
+		unsigned int idx_0 = gpu_field0_index(x, y);
+		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
+		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
+		unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
+		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
+		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
+		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
+		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
+		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
+
+		int y_before = y + 1;
+
+		gpu_outflow(x, y_before, f0, f2, &f0[idx_0], &f2[idx_1], &f2[idx_2], &f2[idx_3], &f2[idx_4], &f2[idx_5], &f2[idx_6], &f2[idx_7], &f2[idx_8]);
+	}
+
+	if(y == Ny_d-1){
+		unsigned int idx_0 = gpu_field0_index(x, y);
+		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
+		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
+		unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
+		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
+		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
+		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
+		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
+		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
+
+		int y_before = y - 1;
+
+		gpu_outflow(x, y_before, f0, f2, &f0[idx_0], &f2[idx_1], &f2[idx_2], &f2[idx_3], &f2[idx_4], &f2[idx_5], &f2[idx_6], &f2[idx_7], &f2[idx_8]);
 	}
 }
 
