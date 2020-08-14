@@ -13,9 +13,16 @@ import multiprocessing as mp
 import funcoes_graficos as fg
 from time import time
 
+def plotting(args):
+    
+    idx_file, rho, ux, uy = args
+    u_mod = np.sqrt(ux**2 + uy**2)
+    
+    fg.grafico(u_mod, idx_file, pasta_img)
+
 ini = time()
-main = "./bin"
-fileyaml = "./bin/dados.yml"
+main = "../bin"
+fileyaml = "../bin/dados.yml"
 velocity = "Velocity"
 
 datafile = open(fileyaml)
@@ -31,7 +38,7 @@ digitos = len(str(Steps))
 
 idx_files = ["%0{}d".format(digitos) % i for i in range(0, Steps+Saves, Saves)]
 
-results = "./bin/Results/"
+results = "../bin/Results/"
 pasta_img = util.criar_pasta('Images', folder=velocity, main_root=main)
 # pasta_stream = util.criar_pasta('Stream', folder=velocity, main_root=main)
 
@@ -51,19 +58,32 @@ for var in dic.keys():
 x = np.arange(1, Nx+1, 1)
 y = np.arange(1, Ny+1, 1)
 
-print("Plotting...")
-for i in range(len(idx_files)):
-    rho = np.memmap(rho_files[i], dtype='float64', shape=(Ny, Nx))
-    ux = np.memmap(ux_files[i], dtype='float64', shape=(Ny, Nx))
-    uy = np.memmap(uy_files[i], dtype='float64', shape=(Ny, Nx))
-    
-    u_mod = np.sqrt(ux**2 + uy**2)
-    
-    fg.grafico(u_mod, idx_files[i], pasta_img)
-    # fg.stream(x, y, ux, uy, u_mod, idx_files[i], pasta_stream)
-    
-    
+CPU = mp.cpu_count()
+pool = mp.Pool()
 
+idx = []
+rhos = np.empty((CPU, Ny, Nx))
+uxs = np.empty_like(rhos)
+uys = np.empty_like(rhos)
+
+i = 0
+print("Reading and plotting data...")
+while(i < len(idx_files)):
+    for j in range(CPU):
+
+        idx.append(idx_files[i])
+        rhos[j] = np.fromfile(rho_files[i], dtype='float64').reshape(Ny, Nx)
+        uxs[j] = np.fromfile(ux_files[i], dtype='float64').reshape(Ny, Nx)
+        uys[j] = np.fromfile(uy_files[i], dtype='float64').reshape(Ny, Nx)
+        
+        i += 1
+        if(i == len(idx_files)):
+            break
+        
+    inputs = zip(idx, rhos, uxs, uys)
+    pool.map_async(plotting, inputs)
+    idx = []
+    
 print('Animating...')
 fg.animation('Velocidade', './', pasta_img)
 # fg.animation('Stream', './', pasta_stream)
