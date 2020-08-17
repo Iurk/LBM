@@ -7,7 +7,7 @@ domain:
 
 simulation:
   lattice: D2Q9
-  NSTEPS: 100000
+  NSTEPS: 10000
   NSAVE: 500
   NMSG: 1000
   computeFlowProperties: true
