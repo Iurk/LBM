@@ -21,8 +21,8 @@ def plotting(args):
     fg.grafico(u_mod, idx_file, pasta_img)
 
 ini = time()
-main = "../bin"
-fileyaml = "../bin/dados.yml"
+main = "./bin"
+fileyaml = "./bin/dados.yml"
 velocity = "Velocity"
 
 datafile = open(fileyaml)
@@ -38,7 +38,7 @@ digitos = len(str(Steps))
 
 idx_files = ["%0{}d".format(digitos) % i for i in range(0, Steps+Saves, Saves)]
 
-results = "../bin/Results/"
+results = "./bin/Results/"
 pasta_img = util.criar_pasta('Images', folder=velocity, main_root=main)
 # pasta_stream = util.criar_pasta('Stream', folder=velocity, main_root=main)
 
