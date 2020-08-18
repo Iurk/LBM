@@ -33,13 +33,17 @@ def animation(nome, pasta, pasta_imagens):
     from os import listdir
     
     file = nome + '.gif'
+    file_2 = nome + '.mp4'
+
     path = pasta + '/%s' % file
+    path_2 = pasta + '/%s' % file_2
     
     files_imgs = [im for im in listdir(pasta_imagens) if im.endswith('.png')]
     files_imgs.sort(key=__ordenar)
     
     images = [imageio.imread(pasta_imagens + '/%s' % file) for file in files_imgs]
     imageio.mimsave(path, images)
+    imageio.mimsave(path_2, images)
     
 def __ordenar(item):
     return int(item.split('.')[1])
