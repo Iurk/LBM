@@ -85,6 +85,7 @@ clean:
 	@rm -f -r $(MESH)/*
 	@rm -f $(EXE)
 	@rm -f *.gif
+	@rm -f *.mp4
 	@echo Done!
 
 mesh:
