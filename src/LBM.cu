@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <string>
@@ -407,7 +408,7 @@ __host__ void save_scalar(const std::string name, double *scalar_gpu, double *sc
 
 	std::ostringstream path, filename;
 
-	std::string ext = ".bin";
+	std::string ext = ".dat";
 
 	int ndigits = floor(log10((double)NSTEPS) + 1.0);
 
@@ -425,20 +426,17 @@ __host__ void save_scalar(const std::string name, double *scalar_gpu, double *sc
 
 	checkCudaErrors(cudaMemcpy(scalar_host, scalar_gpu, mem_size_scalar, cudaMemcpyDeviceToHost));
 
-	FILE* fout = fopen(filename_c, "wb+");
+	std::ofstream fout;
+	fout.open(filename_c, std::ios::binary);
 
-	fwrite(scalar_host, 1, mem_size_scalar, fout);
+	if(fout.is_open()){
 
-	if(ferror(fout)){
-		fprintf(stderr, "Error saving to %s\n", filename_c);
-		perror("");
+		fout.write((char *)scalar_host, mem_size_scalar);
+		fout.close();
 	}
 	else{
-		if(!quiet){
-			printf("Saved to %s\n", filename_c);
-		}
+		printf("Unable to open %s\n", filename_c);
 	}
-	fclose(fout);
 }
 
 void wrapper_input(unsigned int *nx, unsigned int *ny, double *rho, double *u, double *nu, const double *tau){
