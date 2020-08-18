@@ -407,7 +407,7 @@ __host__ void save_scalar(const std::string name, double *scalar_gpu, double *sc
 
 	std::ostringstream path, filename;
 
-	std::string ext = ".bin";
+	std::string ext = ".dat";
 
 	int ndigits = floor(log10((double)NSTEPS) + 1.0);
 
