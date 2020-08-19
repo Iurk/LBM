@@ -26,7 +26,7 @@ Ny = 512    # Número de partículas em y [Lattice units]
 
 Cx = Nx/4       # Centro do Cilindro em x [Lattice units]
 Cy = Ny/2       # Centro do Cilindro em y [Lattice units]
-D_est = 32    # Diâmetro do Cilindro [Lattice units]
+D_est = 100    # Diâmetro do Cilindro [Lattice units]
 
 Reynolds = [15]    # Reynolds Numbers
 cl_Re = []
@@ -40,7 +40,7 @@ uini = 0.04
 mode = 'Constante'
 #escoamento = 'Turbulento'
 
-maxiter = 1000      # Número de Iterações
+maxiter = 5000      # Número de Iterações
 
 #***** D2Q9 Parameters *****
 n = 9                       # Número de Direções do Lattice
@@ -82,6 +82,11 @@ for Re in Reynolds:
         tauab = LBM.tauab(Nx, Ny, e, n, fneq)
         fneq = LBM.dist_neq(Nx, Ny, e, cs, n, W, tauab)
         fout = LBM.collision_step(feq, fneq, omega)
+        
+        fneq_old = fneq
+        
+        if np.all((fneq - fneq_old) > 1e-18):
+            print(step)
 
 #***** Transmissão *****
         f = LBM.transmissao(Nx, Ny, f, fout)
