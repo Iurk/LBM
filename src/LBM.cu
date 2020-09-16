@@ -411,7 +411,13 @@ __host__ void save_scalar(const std::string name, double *scalar_gpu, double *sc
 
 	int ndigits = floor(log10((double)NSTEPS) + 1.0);
 
-	// Criar verificação da pasta Results
+	const char* path_results_c = strdup(folder.c_str());
+
+	DIR *dir_results = opendir(path_results_c);
+	if(ENOENT == errno){
+		mkdir(path_results_c, ACCESSPERMS);
+	}
+
 	path << folder << name << "/";
 	const char* path_c = strdup(path.str().c_str());
 
