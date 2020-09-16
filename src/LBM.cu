@@ -418,6 +418,8 @@ __host__ void save_scalar(const std::string name, double *scalar_gpu, double *sc
 		mkdir(path_results_c, ACCESSPERMS);
 	}
 
+	closedir(dir_results);
+
 	path << folder << name << "/";
 	const char* path_c = strdup(path.str().c_str());
 
@@ -425,6 +427,8 @@ __host__ void save_scalar(const std::string name, double *scalar_gpu, double *sc
 	if(ENOENT == errno){
 		mkdir(path_c, ACCESSPERMS);
 	}
+
+	closedir(dir);
 
 	filename << path.str() << name << std::setfill('0') << std::setw(ndigits) << n << ext;
 	const char* filename_c = strdup(filename.str().c_str());
