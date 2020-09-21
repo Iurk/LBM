@@ -76,39 +76,18 @@ __device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f0, dou
 	*v = uy;
 }
 
-__device__ void gpu_outflow(unsigned int x_before, unsigned int y_before, double *f0, double *f, double *fn0, double *fn1, double *fn2, double *fn3, double *fn4,
-								double *fn5, double *fn6, double *fn7, double *fn8){
+__device__ void gpu_outflow(unsigned int x, unsigned int y, unsigned int x_before, unsigned int y_before, double *f0, double *f){
 
-	unsigned int idx_0 = gpu_field0_index(x_before, y_before);
-	unsigned int idx_1 = gpu_fieldn_index(x_before, y_before, 1);
-	unsigned int idx_2 = gpu_fieldn_index(x_before, y_before, 2);
-	unsigned int idx_3 = gpu_fieldn_index(x_before, y_before, 3);
-	unsigned int idx_4 = gpu_fieldn_index(x_before, y_before, 4);
-	unsigned int idx_5 = gpu_fieldn_index(x_before, y_before, 5);
-	unsigned int idx_6 = gpu_fieldn_index(x_before, y_before, 6);
-	unsigned int idx_7 = gpu_fieldn_index(x_before, y_before, 7);
-	unsigned int idx_8 = gpu_fieldn_index(x_before, y_before, 8);
+	f0[gpu_field0_index(x, y)] = f0[gpu_field0_index(x_before, y_before)];
+	f[gpu_fieldn_index(x, y, 1)] = f[gpu_fieldn_index(x_before, y_before, 1)];
+	f[gpu_fieldn_index(x, y, 2)] = f[gpu_fieldn_index(x_before, y_before, 2)];
+	f[gpu_fieldn_index(x, y, 3)] = f[gpu_fieldn_index(x_before, y_before, 3)];
+	f[gpu_fieldn_index(x, y, 4)] = f[gpu_fieldn_index(x_before, y_before, 4)];
+	f[gpu_fieldn_index(x, y, 5)] = f[gpu_fieldn_index(x_before, y_before, 5)];
+	f[gpu_fieldn_index(x, y, 6)] = f[gpu_fieldn_index(x_before, y_before, 6)];
+	f[gpu_fieldn_index(x, y, 7)] = f[gpu_fieldn_index(x_before, y_before, 7)];
+	f[gpu_fieldn_index(x, y, 8)] = f[gpu_fieldn_index(x_before, y_before, 8)];
 
-	*fn0 = f0[idx_0];
-	*fn1 = f[idx_1];
-	*fn2 = f[idx_2];
-	*fn3 = f[idx_3];
-	*fn4 = f[idx_4];
-	*fn5 = f[idx_5];
-	*fn6 = f[idx_6];
-	*fn7 = f[idx_7];
-	*fn8 = f[idx_8];
-}
-
-__device__ void gpu_noslip(unsigned int x, unsigned int y, double *f2){
-
-	unsigned int noslip[] = {0, 3, 4, 1, 2, 7, 8, 5, 6};
-
-	for(int n = 1; n < q; ++n){
-		unsigned int noslip_n = noslip[n];
-		f2[gpu_fieldn_index(x, y, n)] = f2[gpu_fieldn_index(x, y, noslip_n)];
-	}
-	
 }
 
 __device__ void gpu_bounce_back(unsigned int x, unsigned int y, double *f2){
@@ -125,28 +104,6 @@ __device__ void gpu_bounce_back(unsigned int x, unsigned int y, double *f2){
 			f2[gpu_fieldn_index(x, y, noslip_n)] = f2[gpu_fieldn_index(x, y, n)];
 		}
 	}
-}
-
-__device__ void gpu_bounce_back_top(unsigned int x, unsigned int y, double *f, double *f4, double *f7, double *f8){
-
-	unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
-	unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
-	unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
-
-	*f4 = f[idx_2];
-	*f7 = f[idx_5];
-	*f8 = f[idx_6];
-}
-
-__device__ void gpu_bounce_back_bot(unsigned int x, unsigned int y, double *f, double *f2, double *f5, double *f6){
-
-	unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
-	unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
-	unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
-
-	*f2 = f[idx_4];
-	*f5 = f[idx_7];
-	*f6 = f[idx_8];
 }
 
 __host__ void init_equilibrium(double *f0, double *f1, double *r, double *u, double *v){
@@ -295,51 +252,21 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 	}
 
 	if(x == Nx_d-1){
-		unsigned int idx_0 = gpu_field0_index(x, y);
-		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
-		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
-		unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
-		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
-		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
-		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
-		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
-		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
 		int x_before = x - 1;
-
-		gpu_outflow(x_before, y, f0, f2, &f0[idx_0], &f2[idx_1], &f2[idx_2], &f2[idx_3], &f2[idx_4], &f2[idx_5], &f2[idx_6], &f2[idx_7], &f2[idx_8]);
+		gpu_outflow(x, y, x_before, y, f0, f2);
 	}
 
 	if(y == 0){
-		unsigned int idx_0 = gpu_field0_index(x, y);
-		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
-		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
-		unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
-		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
-		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
-		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
-		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
-		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
 		int y_before = y + 1;
-
-		gpu_outflow(x, y_before, f0, f2, &f0[idx_0], &f2[idx_1], &f2[idx_2], &f2[idx_3], &f2[idx_4], &f2[idx_5], &f2[idx_6], &f2[idx_7], &f2[idx_8]);
+		gpu_outflow(x, y, x, y_before, f0, f2);
 	}
 
 	if(y == Ny_d-1){
-		unsigned int idx_0 = gpu_field0_index(x, y);
-		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
-		unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
-		unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
-		unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
-		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
-		unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
-		unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
-		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
 
 		int y_before = y - 1;
-
-		gpu_outflow(x, y_before, f0, f2, &f0[idx_0], &f2[idx_1], &f2[idx_2], &f2[idx_3], &f2[idx_4], &f2[idx_5], &f2[idx_6], &f2[idx_7], &f2[idx_8]);
+		gpu_outflow(x, y, x, y_before, f0, f2);
 	}
 }
 
