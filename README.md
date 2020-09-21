@@ -11,10 +11,13 @@ Para o correto funcionamento do código são necessários os seguintes pacotes:
 * yaml-cpp - Repositório para a leitura de arquivos .yml em C++. Disponível [nesse link](https://github.com/jbeder/yaml-cpp)
 
 * PyYAML - Biblioteca para leitura de arquivos .yml em Python. Para instalar, basta utilizar o pip, seguindo o comando
-'''
+
+```
 pip install pip install PyYAML
-'''
+```
+
 * imageio-ffmpeg - Biblioteca para a geração da animação em .mp4 em Python. Para instalar, basta utilizar o pip, seguindo o comando
-'''
+
+```
 pip install pip install imageio-ffmpeg
-'''
+```
