@@ -1,11 +1,17 @@
 # LBM
 Lattice-Boltzmann -> Cylinder case
 
-Código de simulação utilizando o método LBM (Lattice-Boltzmann).
+Código de simulação utilizando o método LBM (Lattice-Boltzmann), com paralelização por GPU.
 O problema simulado é o caso do cilindro.
 
-TODO:
+Para o correto funcionamento do código são necessários os seguintes pacotes:
 
-	* main.cu -> adicionar uma verificação para que o número de arquivos não passe de 200, para não dar erro
-	* data_process.py -> Continuar teste para velocidade de plot, plotando apenas a u_mod, leva em torno de 200 s, verificar com o stream plot
-	* LBM.cu -> Testar outro método de leitura de arquivo
+* CUDA drivers - Drivers para a paralelização utilizando a GPU. Disponível no site da [Nvidia](https://developer.nvidia.com/cuda-downloads) e o guia de instalação disponível no [aqui](https://docs.nvidia.com/cuda/cuda-quick-start-guide/index.html)
+
+* yaml-cpp - Repositório para a leitura de arquivos .yml em C++. Disponível [nesse link](https://github.com/jbeder/yaml-cpp)
+
+* PyYAML - Biblioteca para leitura de arquivos .yml em Python. Para instalar, basta utilizar o pip, seguindo o comando
+	$ pip install pip install PyYAML
+	
+* imageio-ffmpeg - Biblioteca para a geração da animação em .mp4 em Python. Para instalar, basta utilizar o pip, seguindo o comando
+	$ pip install pip install imageio-ffmpeg
