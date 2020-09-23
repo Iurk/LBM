@@ -1,5 +1,5 @@
 domain:
-  Nx: 2048
+  Nx: 512
   Ny: 1024
   Cx: Nx/4
   Cy: Ny/2
