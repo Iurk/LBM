@@ -45,10 +45,6 @@ __device__ __forceinline__ size_t gpu_fieldn_index(unsigned int x, unsigned int 
 __global__ void gpu_init_equilibrium(double*, double*, double*, double*, double*);
 __global__ void gpu_stream_collide_save(double*, double*, double*, double*, double*, double*, double*, double*, bool);
 __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, double*, double*);
-__global__ void gpu_init_e(int*, int);
-__global__ void gpu_pop_e(int*, int);
-__global__ void gpu_init_mesh(bool*, int);
-__global__ void gpu_generate_mesh(bool*, int);
 __global__ void gpu_print_mesh(int);
 __global__ void gpu_initialization(double*, double);
 
@@ -397,86 +393,40 @@ void wrapper_lattice(unsigned int *ndir, double *c, double *w_0, double *w_s, do
 
 __host__ int* generate_e(int *e, std::string mode){
 
-	int mode_num;
-
-	dim3 grid(1, 1, 1);
-	dim3 block(ndir, 1, 1);
-
 	int *temp_e;
 
 	size_t mem_e = ndir*sizeof(int);
 
-	checkCudaErrors(cudaMalloc((void**)&temp_e, mem_e));
-	checkCudaErrors(cudaMemset(temp_e, 0, mem_e));
-
-	if(mode == "x"){
-		mode_num = 1;
-	}
-	else if(mode == "y"){
-		mode_num = 2;
-	}
-
-	gpu_init_e<<< 1, 1 >>>(temp_e, mode_num);
-	getLastCudaError("gpu_init_e kernel error");
-
+	checkCudaErrors(cudaMalloc(&temp_e, mem_e));
 	checkCudaErrors(cudaMemcpy(temp_e, e, mem_e, cudaMemcpyHostToDevice));
 
-	gpu_pop_e<<< grid, block >>>(temp_e, mode_num);
-	getLastCudaError("gpu_pop_e kernel error");
+	if(mode == "x"){
+		checkCudaErrors(cudaMemcpyToSymbol(ex_d, &temp_e, sizeof(temp_e)));
+	}
+	else if(mode == "y"){
+		checkCudaErrors(cudaMemcpyToSymbol(ey_d, &temp_e, sizeof(temp_e)));
+	}
 
 	return temp_e;
-
-}
-
-__global__ void gpu_init_e(int *init_e, int mode){
-	if(mode == 1){
-		ex_d = init_e;
-	}
-	else if(mode == 2){
-		ey_d = init_e;
-	}
-}
-
-__global__ void gpu_pop_e(int *e_h, int mode){
-
-	unsigned int n = threadIdx.x;
-
-	if(mode == 1){
-		ex_d[n] = e_h[n];
-		__syncthreads();
-	}
-	else if(mode == 2){
-		ey_d[n] = e_h[n];
-		__syncthreads();
-	}
 }
 
 __host__ bool* generate_mesh(bool *mesh, std::string mode){
 
 	int mode_num;
-
-	dim3 grid(Nx/nThreads, Ny, 1);
-	dim3 block(nThreads, 1, 1);
-
 	bool *temp_mesh;
 
-	checkCudaErrors(cudaMalloc((void**)&temp_mesh, mem_mesh));
-	checkCudaErrors(cudaMemset(temp_mesh, 0, mem_mesh));
+	checkCudaErrors(cudaMalloc(&temp_mesh, mem_mesh));
+	checkCudaErrors(cudaMemcpy(temp_mesh, mesh, mem_mesh, cudaMemcpyHostToDevice));
+	
 
 	if(mode == "solid"){
+		checkCudaErrors(cudaMemcpyToSymbol(cylinder_d, &temp_mesh, sizeof(temp_mesh)));
 		mode_num = 1;
 	}
 	else if(mode == "fluid"){
-		mode_num = 2;
+		checkCudaErrors(cudaMemcpyToSymbol(fluid_d, &temp_mesh, sizeof(temp_mesh)));
+		mode_num = 1;
 	}
-
-	gpu_init_mesh<<< 1, 1 >>>(temp_mesh, mode_num);
-	getLastCudaError("gpu_init_mesh kernel error");
-
-	checkCudaErrors(cudaMemcpy(temp_mesh, mesh, mem_mesh, cudaMemcpyHostToDevice));
-
-	gpu_generate_mesh<<< grid, block >>>(temp_mesh, mode_num);
-	getLastCudaError("gpu_generate_mesh kernel error");
 
 	if(meshprint){
 		gpu_print_mesh<<< 1, 1 >>>(mode_num);
@@ -484,30 +434,6 @@ __host__ bool* generate_mesh(bool *mesh, std::string mode){
 	}
 
 	return temp_mesh;
-}
-
-__global__ void gpu_init_mesh(bool *init_mesh, int mode){
-	if(mode == 1){
-		cylinder_d = init_mesh;
-	}
-	else if(mode == 2){
-		fluid_d = init_mesh;
-	}
-}
-
-__global__ void gpu_generate_mesh(bool *mesh_h, int mode){
-
-	unsigned int y = blockIdx.y;
-	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
-
-	if(mode == 1){
-		cylinder_d[Nx_d*y + x] = mesh_h[Nx_d*y + x];
-		__syncthreads();
-	}
-	else if(mode == 2){
-		fluid_d[Nx_d*y + x] = mesh_h[Nx_d*y + x];
-		__syncthreads();
-	}	
 }
 
 __global__ void gpu_print_mesh(int mode){
@@ -544,4 +470,22 @@ __global__ void gpu_initialization(double *array, double value){
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 
 	array[gpu_scalar_index(x, y)] = value;
+}
+
+__host__ bool* create_pinned_mesh(bool *array){
+
+	bool *pinned;
+	const unsigned int bytes = Nx*Ny*sizeof(bool);
+
+	checkCudaErrors(cudaMallocHost((void**)&pinned, bytes));
+	memcpy(pinned, array, bytes);
+	return pinned;
+}
+
+__host__ double* create_pinned_double(){
+
+	double *pinned;
+
+	checkCudaErrors(cudaMallocHost((void**)&pinned, mem_size_scalar));
+	return pinned;
 }
