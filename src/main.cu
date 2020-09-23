@@ -62,7 +62,8 @@ int main(int argc, char const *argv[]){
 	const size_t mem_size_props = Nx/nThreads*Ny*sizeof(double);
 	checkCudaErrors(cudaMalloc((void**)&prop_gpu, mem_size_props));
 
-	double *scalar_host = (double*) malloc(mem_size_scalar);
+	double *scalar_host;
+	scalar_host = create_pinned_double();
 	if(scalar_host == NULL){
 		fprintf(stderr, "Error: unable to allocate required memory (%.1f MiB).\n", mem_size_scalar/bytesPerMiB);
 		exit(-1);
@@ -97,14 +98,19 @@ int main(int argc, char const *argv[]){
 	wrapper_lattice(ptrNdir, ptrcs, ptrW0, ptrWs, ptrWd);
 
 	int *ex_gpu, *ey_gpu;
-	bool *solid_gpu, *fluid_gpu;
-	
+
 	ex_gpu = generate_e(ex, "x");
 	ey_gpu = generate_e(ey, "y");
 
+	bool *solid_p, *fluid_p;
+	bool *solid_gpu, *fluid_gpu;
+
+	solid_p = create_pinned_mesh(cylinder);
+	fluid_p = create_pinned_mesh(fluid);
+
 	// Generating Mesh
-	solid_gpu = generate_mesh(cylinder, "solid");
-	fluid_gpu = generate_mesh(fluid, "fluid");
+	solid_gpu = generate_mesh(solid_p, "solid");
+	fluid_gpu = generate_mesh(fluid_p, "fluid");
 
 	// Initialization
 	initialization(rho_gpu, rho0);
@@ -164,7 +170,7 @@ int main(int argc, char const *argv[]){
 			}
 		}
 	}
-
+	
 	// Measuring time
 	checkCudaErrors(cudaEventRecord(stop, 0));
 	checkCudaErrors(cudaEventSynchronize(stop));
@@ -195,11 +201,14 @@ int main(int argc, char const *argv[]){
 	printf("                  Speed: %.2f (Mlups)\n", speed);
 	printf("               Bandwith: %.1f (GiB/s)\n", bandwidth);
 
+	// Cleaning up
+
 	// Destroying Events
 	checkCudaErrors(cudaEventDestroy(start));
 	checkCudaErrors(cudaEventDestroy(stop));
 
 	// Freeing Device and CPU Memory
+	// LBM variables
 	checkCudaErrors(cudaFree(f0_gpu));
 	checkCudaErrors(cudaFree(f1_gpu));
 	checkCudaErrors(cudaFree(f2_gpu));
@@ -211,9 +220,15 @@ int main(int argc, char const *argv[]){
 	checkCudaErrors(cudaFree(prop_gpu));
 	checkCudaErrors(cudaFree(ex_gpu));
 	checkCudaErrors(cudaFree(ey_gpu));
+
+	// Mesh arrays
 	checkCudaErrors(cudaFree(solid_gpu));
 	checkCudaErrors(cudaFree(fluid_gpu));
-	free(scalar_host);
+	checkCudaErrors(cudaFreeHost(solid_p));
+	checkCudaErrors(cudaFreeHost(fluid_p));
+
+	// Host arrays
+	checkCudaErrors(cudaFreeHost(scalar_host));
 
 	cudaDeviceReset();
 
