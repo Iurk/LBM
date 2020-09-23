@@ -1,5 +1,5 @@
 domain:
-  Nx: 512
+  Nx: 2048
   Ny: 1024
   Cx: Nx/4
   Cy: Ny/2
@@ -7,7 +7,7 @@ domain:
 
 simulation:
   lattice: D2Q9
-  NSTEPS: 50000
+  NSTEPS: 10000
   NSAVE: 200
   NMSG: 1000
   computeFlowProperties: true
