@@ -13,7 +13,8 @@ void wrapper_input(unsigned int*, unsigned int*, double*, double*, double*, cons
 void wrapper_lattice(unsigned int*, double*, double*, double*, double*);
 int* generate_e(int*, std::string);
 bool* generate_mesh(bool*, std::string);
-void fill_array(double*, double , size_t);
+bool* create_pinned_mesh(bool *);
+double* create_pinned_double();
 
 #define checkCudaErrors(err) __checkCudaErrors(err, #err, __FILE__, __LINE__)
 #define getLastCudaError(msg) __getLastCudaError(msg, __FILE__, __LINE__)
