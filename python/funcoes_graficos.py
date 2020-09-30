@@ -14,7 +14,7 @@ def grafico(u, step, pasta_imagens):
     path = pasta_imagens + '/%s' % file
     plt.clf()
     plt.imshow(u, cmap=cm.RdBu, interpolation='nearest')
-    plt.colorbar(cmap=cm.RdBu)
+    plt.colorbar()
     plt.savefig(path, dpi=250)
     
 def stream(x, y, u, v, u_mod, step, pasta_imagens):
