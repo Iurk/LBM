@@ -255,14 +255,22 @@ __global__ void gpu_stream_collide_save(double *f0, double *f1, double *f2, doub
 
 	if(y == 0){
 
-		int y_before = y + 1;
-		gpu_outflow(x, y, x, y_before, f0, f2);
+		//int y_before = y + 1;
+		//gpu_outflow(x, y, x, y_before, f0, f2);
+
+		f2[gpu_fieldn_index(x, y, 2)] = f2[gpu_fieldn_index(x, y, 4)];
+		f2[gpu_fieldn_index(x, y, 5)] = f2[gpu_fieldn_index(x, y, 7)];
+		f2[gpu_fieldn_index(x, y, 6)] = f2[gpu_fieldn_index(x, y, 8)];
 	}
 
 	if(y == Ny_d-1){
 
-		int y_before = y - 1;
-		gpu_outflow(x, y, x, y_before, f0, f2);
+		//int y_before = y - 1;
+		//gpu_outflow(x, y, x, y_before, f0, f2);
+
+		f2[gpu_fieldn_index(x, y, 4)] = f2[gpu_fieldn_index(x, y, 2)];
+		f2[gpu_fieldn_index(x, y, 7)] = f2[gpu_fieldn_index(x, y, 5)];
+		f2[gpu_fieldn_index(x, y, 8)] = f2[gpu_fieldn_index(x, y, 6)];
 	}
 }
 
