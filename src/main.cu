@@ -76,26 +76,11 @@ int main(int argc, char const *argv[]){
 	checkCudaErrors(cudaEventCreate(&start));
 	checkCudaErrors(cudaEventCreate(&stop));
 
-	// Declaration and Allocation of Input data in Device constant memory
-	unsigned int *ptrNx, *ptrNy;
-	double *ptrrho0, *ptru_max;
-	double *ptrNu;
-	const double *ptrTau;
+	// Allocation of Input data in Device constant memory
+	wrapper_input(&Nx, &Ny, &rho0, &u_max, &nu, &tau);
 
-	ptrNx = &Nx; ptrNy = &Ny;
-	ptrrho0 = &rho0; ptru_max = &u_max;
-	ptrNu = &nu; ptrTau = &tau;
-
-	wrapper_input(ptrNx, ptrNy, ptrrho0, ptru_max, ptrNu, ptrTau);
-
-	// Declaration and Allocation of Lattice data in Device constant and global memory
-	unsigned int *ptrNdir;
-	double *ptrcs, *ptrW0, *ptrWs, *ptrWd;
-
-	ptrNdir = &ndir; ptrcs = &cs; 
-	ptrW0 = &w0; ptrWs = &ws; ptrWd = &wd;
-
-	wrapper_lattice(ptrNdir, ptrcs, ptrW0, ptrWs, ptrWd);
+	// Allocation of Lattice data in Device constant and global memory
+	wrapper_lattice(&ndir, &cs, &w0, &ws, &wd);
 
 	int *ex_gpu, *ey_gpu;
 
