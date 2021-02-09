@@ -155,37 +155,20 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *fneq, do
 	unsigned int y = blockIdx.y;
 	unsigned int x = blockIdx.x*blockDim.x + threadIdx.x;
 
-	unsigned int xf = (x + 1)%Nx_d;			// Forward
-	unsigned int yf = (y + 1)%Ny_d;			// Forward
-	unsigned int xb = (Nx_d + x - 1)%Nx_d;	// Backward
-	unsigned int yb = (Ny_d + y - 1)%Ny_d;	// Backward
-
-	double ft0 = f1[gpu_fieldn_index(x, y, 0)];
-
-	// Streaming step
-	double ft1 = f1[gpu_fieldn_index(xb, y, 1)];
-	double ft2 = f1[gpu_fieldn_index(x, yb, 2)];
-	double ft3 = f1[gpu_fieldn_index(xf, y, 3)];
-	double ft4 = f1[gpu_fieldn_index(x, yf, 4)];
-	double ft5 = f1[gpu_fieldn_index(xb, yb, 5)];
-	double ft6 = f1[gpu_fieldn_index(xf, yb, 6)];
-	double ft7 = f1[gpu_fieldn_index(xf, yf, 7)];
-	double ft8 = f1[gpu_fieldn_index(xb, yf, 8)];
-
-	double f[] = {ft0, ft1, ft2, ft3, ft4, ft5, ft6, ft7, ft8};
+	unsigned int x_att, y_att;
 
 	double rho = 0, ux_i = 0, uy_i = 0;
-
 	for(int n = 0; n < q; ++n){
-		rho += f[n];
-		ux_i += f[n]*ex_d[n];
-		uy_i += f[n]*ey_d[n];
+		x_att = (x - ex_d[n] + Nx_d)%Nx_d;
+		y_att = (y - ey_d[n] + Ny_d)%Ny_d;
+
+		rho += f1[gpu_fieldn_index(x_att, y_att, n)];
+		ux_i += f1[gpu_fieldn_index(x_att, y_att, n)]*ex_d[n];
+		uy_i += f1[gpu_fieldn_index(x_att, y_att, n)]*ey_d[n];
 	}
 
-	double rhoinv = 1.0/rho;
-
-	double ux = rhoinv*ux_i;
-	double uy = rhoinv*uy_i;
+	double ux = ux_i/rho;
+	double uy = uy_i/rho;
 
 	if(save){
 		r[gpu_scalar_index(x, y)] = rho;
@@ -207,9 +190,12 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *fneq, do
 
 	// Approximation of fneq
 	for(int n = 0; n < q; ++n){
+		x_att = (x - ex_d[n] + Nx_d)%Nx_d;
+		y_att = (y - ey_d[n] + Ny_d)%Ny_d;
+
 		double eidotu = ux*ex_d[n] + uy*ey_d[n];
 		double feq = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
-		fneq[gpu_fieldn_index(x, y, n)] = f[n] - feq;
+		fneq[gpu_fieldn_index(x, y, n)] = f1[gpu_fieldn_index(x_att, y_att, n)] - feq;
 	}
 
 	// Calculating the Viscous stress tensor
