@@ -10,7 +10,8 @@ namespace myGlobals{
 
 	//Simulation
 	extern unsigned int NSTEPS, NSAVE, NMSG;
-	extern bool computeFlowProperties, quiet, meshprint;
+	extern bool meshprint;
+	extern double erro_max;
 
 	//GPU
 	extern unsigned int nThreads;
@@ -24,7 +25,7 @@ namespace myGlobals{
 	extern unsigned int ndir;
 	extern int *ex;
 	extern int *ey;
-	extern double cs, w0, ws, wd;
+	extern double cs, w0, wp, ws;
 
 	//Memory Sizes
 	extern const size_t mem_mesh;

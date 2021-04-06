@@ -29,9 +29,8 @@ namespace myGlobals{
 	unsigned int NSTEPS = simulation["NSTEPS"].as<int>();
 	unsigned int NSAVE = simulation["NSAVE"].as<int>();
 	unsigned int NMSG = simulation["NMSG"].as<int>();
-	bool computeFlowProperties = simulation["computeFlowProperties"].as<bool>();
-	bool quiet = simulation["quiet"].as<bool>();
 	bool meshprint = simulation["meshprint"].as<bool>();
+	double erro_max = simulation["erro_max"].as<double>();
 
 	//GPU
 	unsigned int nThreads = gpu["nThreads"].as<unsigned int>();
@@ -47,8 +46,8 @@ namespace myGlobals{
 	std::vector<int> ey_vec = lattice["ey"].as<std::vector<int>>();
 	std::string cs_str = lattice["cs"].as<std::string>();
 	std::string w0_str = lattice["w0"].as<std::string>();
+	std::string wp_str = lattice["wp"].as<std::string>();
 	std::string ws_str = lattice["ws"].as<std::string>();
-	std::string wd_str = lattice["wd"].as<std::string>();
 
 	int *ex = ex_vec.data();
 	int *ey = ey_vec.data();
