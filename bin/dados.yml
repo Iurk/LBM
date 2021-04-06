@@ -1,5 +1,5 @@
 domain:
-  Nx: 512
+  Nx: 1024
   Ny: 256
   Cx: Nx/4
   Cy: Ny/2
@@ -7,7 +7,7 @@ domain:
 
 simulation:
   lattice: D2Q9
-  NSTEPS: 10000
+  NSTEPS: 200000
   NSAVE: 400
   NMSG: 1000
   meshprint: false
@@ -30,3 +30,8 @@ water:
   rho: 998
   mi: 1.01e-3
   nu: 1.01e-6
+
+output:
+  plot_mod: true
+  plot_perfil: false
+
