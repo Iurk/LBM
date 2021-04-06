@@ -49,60 +49,7 @@ __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, doub
 __global__ void gpu_print_mesh(int);
 __global__ void gpu_initialization(double*, double);
 
-// Boundary Conditions
-__device__ void gpu_zou_he_inlet(unsigned int x, unsigned int y, double *f, double *f1,
-								double *f5, double *f8, double *r, double *u, double *v){
-
-	double ux = u_max_d;
-	double uy = 0;
-
-	unsigned int idx_0 = gpu_fieldn_index(x, y, 0);
-	unsigned int idx_2 = gpu_fieldn_index(x, y, 2);
-	unsigned int idx_3 = gpu_fieldn_index(x, y, 3);
-	unsigned int idx_4 = gpu_fieldn_index(x, y, 4);
-	unsigned int idx_6 = gpu_fieldn_index(x, y, 6);
-	unsigned int idx_7 = gpu_fieldn_index(x, y, 7);
-
-	double rho = (f[idx_0] + f[idx_2] + f[idx_4] + 2*(f[idx_3] + f[idx_6] + f[idx_7]))/(1.0 - ux);
-	*f1 = f[idx_3] + 2.0/3.0*rho*ux;
-	*f5 = f[idx_7] - 0.5*(f[idx_2] - f[idx_4]) + 1.0/6.0*rho*ux;
-	*f8 = f[idx_6] + 0.5*(f[idx_2] - f[idx_4]) + 1.0/6.0*rho*ux;
-
-	*r = rho;
-	*u = ux;
-	*v = uy;
-}
-
-__device__ void gpu_outflow(unsigned int x, unsigned int y, unsigned int x_before, unsigned int y_before, double *f){
-
-	f[gpu_fieldn_index(x, y, 0)] = f[gpu_fieldn_index(x_before, y_before, 0)];
-	f[gpu_fieldn_index(x, y, 1)] = f[gpu_fieldn_index(x_before, y_before, 1)];
-	f[gpu_fieldn_index(x, y, 2)] = f[gpu_fieldn_index(x_before, y_before, 2)];
-	f[gpu_fieldn_index(x, y, 3)] = f[gpu_fieldn_index(x_before, y_before, 3)];
-	f[gpu_fieldn_index(x, y, 4)] = f[gpu_fieldn_index(x_before, y_before, 4)];
-	f[gpu_fieldn_index(x, y, 5)] = f[gpu_fieldn_index(x_before, y_before, 5)];
-	f[gpu_fieldn_index(x, y, 6)] = f[gpu_fieldn_index(x_before, y_before, 6)];
-	f[gpu_fieldn_index(x, y, 7)] = f[gpu_fieldn_index(x_before, y_before, 7)];
-	f[gpu_fieldn_index(x, y, 8)] = f[gpu_fieldn_index(x_before, y_before, 8)];
-
-}
-
-__device__ void gpu_bounce_back(unsigned int x, unsigned int y, double *f2){
-	unsigned int noslip[] = {0, 3, 4, 1, 2, 7, 8, 5, 6};
-
-	for(int n = 1; n < q; ++n){
-		unsigned int x_next = x + ex_d[n];
-		unsigned int y_next = y + ey_d[n];
-
-		bool solid = cylinder_d[gpu_scalar_index(x_next, y_next)];
-
-		unsigned int noslip_n = noslip[n];
-		if (solid){
-			f2[gpu_fieldn_index(x, y, noslip_n)] = f2[gpu_fieldn_index(x, y, n)];
-		}
-	}
-}
-
+// Equilibrium
 __device__ void gpu_equilibrium(unsigned int x, unsigned int y, double rho, double ux, double uy, double *feq){
 
 	double cs2 = cs_d*cs_d;
@@ -127,6 +74,7 @@ __device__ void gpu_equilibrium(unsigned int x, unsigned int y, double rho, doub
 	}
 }
 
+// Non Equilibrium
 __device__ void gpu_nonequilibrium(unsigned int x, unsigned int y, double tauxx, double tauxy, double tauyy, double *fneq){
 
 	double cs2 = cs_d*cs_d;
