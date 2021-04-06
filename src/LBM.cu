@@ -22,7 +22,7 @@ __constant__ unsigned int q, Nx_d, Ny_d;
 __constant__ double rho0_d, u_max_d, nu_d, tau_d;
 
 //Lattice Data
-__constant__ double cs_d, w0_d, ws_d, wd_d;
+__constant__ double cs_d, w0_d, wp_d, ws_d;
 __device__ int *ex_d;
 __device__ int *ey_d;
 
@@ -102,6 +102,50 @@ __device__ void gpu_bounce_back(unsigned int x, unsigned int y, double *f2){
 	}
 }
 
+__device__ void gpu_equilibrium(unsigned int x, unsigned int y, double rho, double ux, double uy, double *feq){
+
+	double cs2 = cs_d*cs_d;
+	double cs4 = cs2*cs2;
+	double cs6 = cs4*cs2;
+
+	double A = 1.0/(cs2);
+	double B = 1.0/(2.0*cs4);
+
+	double W[] = {w0, wp, wp, wp, wp, ws, ws, ws, ws};
+	for(int n = 0; n < q; ++n){
+		
+		double ux2 = ux*ux;
+		double uy2 = uy*uy;
+		double ex2 = ex_d[n]*ex_d[n];
+		double ey2 = ey_d[n]*ey_d[n];
+
+		double order_1 = A*(ux*ex_d[n] + uy*ey_d[n]);
+		double order_2 = B*(ux2*(ex2 - cs2) + 2*ux*uy*ex_d[n]*ey_d[n] + uy2*(ey2 - cs2));
+
+		feq[gpu_fieldn_index(x, y, n)] = W[n]*rho*(1 + order_1 + order_2);
+	}
+}
+
+__device__ void gpu_nonequilibrium(unsigned int x, unsigned int y, double tauxx, double tauxy, double tauyy, double *fneq){
+
+	double cs2 = cs_d*cs_d;
+	double cs4 = cs2*cs2;
+
+	double B = 1.0/(2.0*cs4);
+
+	double W[] = {w0, wp, wp, wp, wp, ws, ws, ws, ws};
+	for(int n = 0; n < q; ++n){
+		
+		double ex2 = ex_d[n]*ex_d[n];
+		double ey2 = ey_d[n]*ey_d[n];
+
+		double order_1 = B*(tauxx*(ex2 - cs2) + 2*tauxy*ex_d[n]*ey_d[n] + tauyy*(ey2 - cs2));
+
+		fneq[gpu_fieldn_index(x, y, n)] = W[n]*(order_1);
+	}	
+
+}
+
 __host__ void init_equilibrium(double *f1, double *r, double *u, double *v){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
@@ -120,23 +164,10 @@ __global__ void gpu_init_equilibrium(double *f1, double *r, double *u, double *v
 	double ux = u[gpu_scalar_index(x, y)];
 	double uy = v[gpu_scalar_index(x, y)];
 
-	double A = 1.0/(cs_d*cs_d);
-	double B = 1.0/(2.0*cs_d*cs_d);
-
-	double w0r = w0_d*rho;
-	double wsr = ws_d*rho;
-	double wdr = wd_d*rho;
-	double omusq = 1.0 - B*(ux*ux + uy*uy);
-
-	double Wrho[] = {w0r, wsr, wsr, wsr, wsr, wdr, wdr, wdr, wdr};
-
-	for(int n = 0; n < q; ++n){
-		double eidotu = ux*ex_d[n] + uy*ey_d[n];
-		f1[gpu_fieldn_index(x, y, n)] = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
-	}
+	gpu_equilibrium(x, y, rho, ux, uy, f1);
 }
 
-__host__ void stream_collide_save(double *f1, double *f2, double *fneq, double *r, double *u, double *v, bool save){
+__host__ void stream_collide_save(double *f1, double *f2, double *feq, double *fneq, double *r, double *u, double *v, bool save){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
@@ -144,11 +175,11 @@ __host__ void stream_collide_save(double *f1, double *f2, double *fneq, double *
 	//dim3 grid(1,1,1);
 	//dim3 block(1,1,1);
 
-	gpu_stream_collide_save<<< grid, block >>>(f1, f2, fneq, r, u, v, save);
+	gpu_stream_collide_save<<< grid, block >>>(f1, f2, feq, fneq, r, u, v, save);
 	getLastCudaError("gpu_stream_collide_save kernel error");
 }
 
-__global__ void gpu_stream_collide_save(double *f1, double *f2, double *fneq, double *r, double *u, double *v, bool save){
+__global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, double *fneq, double *r, double *u, double *v, bool save){
 
 	const double omega = 1.0/tau_d;
 
@@ -159,43 +190,26 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *fneq, do
 
 	double rho = 0, ux_i = 0, uy_i = 0;
 	for(int n = 0; n < q; ++n){
-		x_att = (x - ex_d[n] + Nx_d)%Nx_d;
-		y_att = (y - ey_d[n] + Ny_d)%Ny_d;
-
-		rho += f1[gpu_fieldn_index(x_att, y_att, n)];
-		ux_i += f1[gpu_fieldn_index(x_att, y_att, n)]*ex_d[n];
-		uy_i += f1[gpu_fieldn_index(x_att, y_att, n)]*ey_d[n];
+		rho += f1[gpu_fieldn_index(x, y, n)];
+		ux_i += f1[gpu_fieldn_index(x, y, n)]*ex_d[n];
+		uy_i += f1[gpu_fieldn_index(x, y, n)]*ey_d[n];
 	}
 
 	double ux = ux_i/rho;
 	double uy = uy_i/rho;
 
-	if(save){
-		r[gpu_scalar_index(x, y)] = rho;
-		u[gpu_scalar_index(x, y)] = ux;
-		v[gpu_scalar_index(x, y)] = uy;
-	}
+	r[gpu_scalar_index(x, y)] = rho;
+	u[gpu_scalar_index(x, y)] = ux;
+	v[gpu_scalar_index(x, y)] = uy;
+	
+	double cs2 = cs_d*cs_d;
+	double cs4 = cs2*cs2
 
-	double A = 1.0/(cs_d*cs_d);
-	double B = 1.0/(2.0*cs_d*cs_d);
-
-	double w0r = w0_d*rho;
-	double wsr = ws_d*rho;
-	double wdr = wd_d*rho;
-
-	double W[] = {w0_d, ws_d, ws_d, ws_d, ws_d, wd_d, wd_d, wd_d, wd_d};
-	double Wrho[] = {w0r, wsr, wsr, wsr, wsr, wdr, wdr, wdr, wdr};
-
-	double omusq = 1.0 - B*(ux*ux + uy*uy);
+	gpu_equilibrium(x, y, rho, ux, uy, feq);
 
 	// Approximation of fneq
 	for(int n = 0; n < q; ++n){
-		x_att = (x - ex_d[n] + Nx_d)%Nx_d;
-		y_att = (y - ey_d[n] + Ny_d)%Ny_d;
-
-		double eidotu = ux*ex_d[n] + uy*ey_d[n];
-		double feq = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
-		fneq[gpu_fieldn_index(x, y, n)] = f1[gpu_fieldn_index(x_att, y_att, n)] - feq;
+		fneq[gpu_fieldn_index(x, y, n)] = f1[gpu_fieldn_index(x, y, n)] - feq[gpu_fieldn_index(x, y, n)];
 	}
 
 	// Calculating the Viscous stress tensor
@@ -206,12 +220,23 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *fneq, do
 		tauyy += fneq[gpu_fieldn_index(x, y, n)]*ey_d[n]*ey_d[n];
 	}
 
+	// Recalculating fneq
+	gpu_nonequilibrium(x, y, tauxx, tauxy, tauyy, fneq);
+
+	// Collision Step
 	for(int n = 0; n < q; ++n){
-		fneq[gpu_fieldn_index(x, y, n)] = B*W[n]*(tauxx*(A*ex_d[n]*ex_d[n] - 1.0) + 2.0*tauxy*A*ex_d[n]*ey_d[n] + tauyy*(A*ey_d[n]*ey_d[n] - 1.0));
-		double eidotu = ux*ex_d[n] + uy*ey_d[n];
-		double feq = Wrho[n]*(omusq + A*eidotu*(1.0 + B*eidotu));
-		f2[gpu_fieldn_index(x, y, n)] = (1.0 - omega)*fneq[gpu_fieldn_index(x, y, n)] + feq;
+		f1[gpu_fieldn_index(x, y, n)] = feq[gpu_fieldn_index(x, y, n)] (1.0 - omega)*fneq[gpu_fieldn_index(x, y, n)];
 	}
+
+	// Stream Step
+	for(int n = 0; n < q; ++n){
+		x_att = (x + ex_d[n] + Nx_d)%Nx_d;
+		y_att = (y + ey_d[n] + Ny_d)%Ny_d;
+
+		f2[gpu_fieldn_index(x_att, y_att, n)] = f1[gpu_fieldn_index(x, y, n)];
+	}
+
+
 
 	bool node_fluid = fluid_d[gpu_scalar_index(x, y)];
 
@@ -256,7 +281,88 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *fneq, do
 	}
 }
 
-__host__ void compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop, double *prop_gpu, double *prop_host){
+__host__ double report_convergence(unsigned int t, double *u, double *u_old, double *conv_host, double *conv_gpu, bool msg){
+
+	double conv;
+	conv = compute_convergence(u, u_old, conv_host, conv_gpu);
+
+	if(msg){
+		std::cout << std::setw(10) << t << std::setw(20) << conv << std::endl;
+	}
+
+	return conv;
+}
+
+__host__ double compute_convergence(double *u, double *u_old, double *conv_host, double *conv_gpu){
+
+	dim3 grid(1, Ny/nThreads, 1);
+	dim3 block(1, nThreads, 1);
+
+	gpu_compute_convergence<<< grid, block >>>(u, u_old, conv_gpu);
+	getLastCudaError("gpu_compute_convergence kernel error");
+
+	size_t conv_size_bytes = 2*grid.x*grid.y*sizeof(double);
+	checkCudaErrors(cudaMemcpy(conv_host, conv_gpu, conv_size_bytes, cudaMemcpyDeviceToHost));
+
+	double convergence;
+	double sumuxe2 = 0.0
+	double sumuxa2 = 0.0
+
+	for(unsigned int i = 0; i < grid.x*grid.y; ++i){
+		sumuxe2 += conv_host[2*i];
+		sumuxa2 += conv_host[2*i+1];
+	}
+
+	convergence = sqrt(sumuxe2/sumuxa2);
+	return convergence;
+}
+
+__global__ void gpu_compute_convergence(double *u, double *u_old, double *conv){
+
+	unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
+	unsigned int x = Nx_d/4;
+
+	extern __shared__ double data[];
+
+	double *uxe2 = data;
+	double *uxa2 = data + 1*blockDim.x;
+
+	double ux = u[gpu_scalar_index(x, y)];
+	double ux_old = u_old[gpu_scalar_index(x, y)];
+
+	uxe2[threadIdx.y] = (ux - ux_old)*(ux - ux_old);
+	uxa2[threadIdx.y] = ux_old*ux_old;
+
+	__syncthreads();
+
+	if(threadIdx.y == 0){
+
+		size_t idx = 2*(gridDim.x*blockIdx.y + blockIdx.x);
+
+		for(int n = 0; n < 2; ++n){
+			conv[idx+n] = 0.0;
+		}
+
+		for(int i = 0; i < blockDim.x; ++i){
+			conv[idx  ] += uxe2[i];
+			conv[idx+1] += uxa2[i];
+		}
+	}
+}
+
+__host__ std::vector<double> report_flow_properties(unsigned int t, double conv, double *rho, double *ux, double *uy, double *prop_gpu, double *prop_host, bool msg){
+
+	std::vector<double> prop;
+
+	if(msg){
+		prop = compute_flow_properties(t, rho, ux, uy, prop, prop_gpu, prop_host);
+		std::cout << std::setw(10) << t << std::setw(13) << prop[0] << std::setw(15) << prop[1] << std::setw(20) << conv << std::endl;
+	}
+
+	return prop;
+}
+
+__host__ std::vector<double> compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop, double *prop_gpu, double *prop_host){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
@@ -268,13 +374,16 @@ __host__ void compute_flow_properties(unsigned int t, double *r, double *u, doub
 	checkCudaErrors(cudaMemcpy(prop_host, prop_gpu, prop_size_bytes, cudaMemcpyDeviceToHost));
 
 	double E = 0.0;
+	double sumuxe2 = 0.0
+	double sumuxa2 = 0.0
 
 	for(unsigned int i = 0; i < grid.x*grid.y; ++i){
-
 		E += prop_host[i];
 	}
 
-	prop[0] = E;
+	prop.push_back(E);
+
+	return prop;
 }
 
 __global__ void gpu_compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop_gpu){
@@ -308,62 +417,6 @@ __global__ void gpu_compute_flow_properties(unsigned int t, double *r, double *u
 	}
 }
 
-__host__ void report_flow_properties(unsigned int t, double *rho, double *ux, double *uy,
-									 double *prop_gpu, double *prop_host){
-
-	double prop[1];
-	compute_flow_properties(t, rho, ux, uy, prop, prop_gpu, prop_host);
-	printf("%u, %g\n", t, prop[0]);
-}
-
-__host__ void save_scalar(const std::string name, double *scalar_gpu, double *scalar_host, unsigned int n){
-
-	std::ostringstream path, filename;
-
-	std::string ext = ".dat";
-
-	int ndigits = floor(log10((double)NSTEPS) + 1.0);
-
-	const char* path_results_c = strdup(folder.c_str());
-
-	DIR *dir_results = opendir(path_results_c);
-	if(ENOENT == errno){
-		mkdir(path_results_c, ACCESSPERMS);
-	}
-
-	closedir(dir_results);
-
-	path << folder << name << "/";
-	const char* path_c = strdup(path.str().c_str());
-
-	DIR *dir = opendir(path_c);
-	if(ENOENT == errno){
-		mkdir(path_c, ACCESSPERMS);
-	}
-
-	closedir(dir);
-
-	filename << path.str() << name << std::setfill('0') << std::setw(ndigits) << n << ext;
-	const char* filename_c = strdup(filename.str().c_str());
-
-	checkCudaErrors(cudaMemcpy(scalar_host, scalar_gpu, mem_size_scalar, cudaMemcpyDeviceToHost));
-
-	FILE* fout = fopen(filename_c, "wb+");
-
-	fwrite(scalar_host, 1, mem_size_scalar, fout);
-
-	if(ferror(fout)){
-		fprintf(stderr, "Error saving to %s\n", filename_c);
-		perror("");
-	}
-	else{
-		if(!quiet){
-			printf("Saved to %s\n", filename_c);
-		}
-	}
-	fclose(fout);
-}
-
 void wrapper_input(unsigned int *nx, unsigned int *ny, double *rho, double *u, double *nu, const double *tau){
 	checkCudaErrors(cudaMemcpyToSymbol(Nx_d, nx, sizeof(unsigned int)));
 	checkCudaErrors(cudaMemcpyToSymbol(Ny_d, ny, sizeof(unsigned int)));
@@ -377,8 +430,8 @@ void wrapper_lattice(unsigned int *ndir, double *c, double *w_0, double *w_s, do
 	checkCudaErrors(cudaMemcpyToSymbol(q, ndir, sizeof(unsigned int)));
 	checkCudaErrors(cudaMemcpyToSymbol(cs_d, c, sizeof(double)));
 	checkCudaErrors(cudaMemcpyToSymbol(w0_d, w_0, sizeof(double)));
-	checkCudaErrors(cudaMemcpyToSymbol(ws_d, w_s, sizeof(double)));
-	checkCudaErrors(cudaMemcpyToSymbol(wd_d, w_d, sizeof(double)));
+	checkCudaErrors(cudaMemcpyToSymbol(wp_d, w_s, sizeof(double)));
+	checkCudaErrors(cudaMemcpyToSymbol(ws_d, w_d, sizeof(double)));
 }
 
 __host__ int* generate_e(int *e, std::string mode){
