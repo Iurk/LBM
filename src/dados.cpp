@@ -53,8 +53,8 @@ namespace myGlobals{
 	int *ey = ey_vec.data();
 	double cs = equation_parser(cs_str);
 	double w0 = equation_parser(w0_str);
+	double wp = equation_parser(wp_str);
 	double ws = equation_parser(ws_str);
-	double wd = equation_parser(wd_str);
 
 	//Memory Sizes
 	const size_t mem_mesh = sizeof(bool)*Nx*Ny;
