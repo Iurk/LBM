@@ -1,9 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "seconds.h"
-#include "LBM.h"
 #include "dados.h"
+#include "saving.h"
+#include "seconds.h"
+
+#include "LBM.h"
+#include "boundary.h"
 
 using namespace myGlobals;
 
@@ -45,22 +48,27 @@ int main(int argc, char const *argv[]){
 	printf("\n");
 
 	// Declaration and Allocation in device Memory
-	double *f1_gpu, *f2_gpu, *fneq_gpu;
-	double *rho_gpu, *ux_gpu, *uy_gpu;
+	double *f1_gpu, *f2_gpu, *feq_gpu, *fneq_gpu;
+	double *rho_gpu, *ux_gpu, *uy_gpu, *ux_old_gpu;
 	double *prop_gpu;
 
 	checkCudaErrors(cudaMalloc((void**)&f1_gpu, mem_size_ndir));
 	checkCudaErrors(cudaMalloc((void**)&f2_gpu, mem_size_ndir));
+	checkCudaErrors(cudaMalloc((void**)&feq_gpu, mem_size_ndir));
 	checkCudaErrors(cudaMalloc((void**)&fneq_gpu, mem_size_ndir));
 	checkCudaErrors(cudaMalloc((void**)&rho_gpu, mem_size_scalar));
 	checkCudaErrors(cudaMalloc((void**)&ux_gpu, mem_size_scalar));
 	checkCudaErrors(cudaMalloc((void**)&uy_gpu, mem_size_scalar));
+	checkCudaErrors(cudaMalloc((void**)&ux_old_gpu, mem_size_scalar));
 
+	const size_t mem_size_conv = 2*1*Ny/nThreads*sizeof(double);
 	const size_t mem_size_props = Nx/nThreads*Ny*sizeof(double);
 	checkCudaErrors(cudaMalloc((void**)&prop_gpu, mem_size_props));
+	checkCudaErrors(cudaMalloc((void**)&conv_gpu, mem_size_conv));
 
-	double *scalar_host;
+	double *scalar_host, *conv_host;
 	scalar_host = create_pinned_double();
+	conv_host = create_pinned_double();
 	if(scalar_host == NULL){
 		fprintf(stderr, "Error: unable to allocate required memory (%.1f MiB).\n", mem_size_scalar/bytesPerMiB);
 		exit(-1);
@@ -110,11 +118,17 @@ int main(int argc, char const *argv[]){
 	double begin = seconds();
 	checkCudaErrors(cudaEventRecord(start, 0));
 
+	double conv_error;
+	unsigned int end_step;
+	std::vector<double> fluid_prop;
+
 	// Main Loop
+	printf("Starting main loop...\n");
+	std::cout << std::setw(10) << "Timestep" << std::setw(20) << "Convergence" << std::endl;
 	for(unsigned int n = 0; n < NSTEPS; ++n){
 		bool save = (n+1)%NSAVE == 0;
 		bool msg = (n+1)%NMSG == 0;
-		bool need_scalars = save || (msg && computeFlowProperties);
+		bool need_scalars = save || (msg);
 /*
 		double *ux_test;
 
@@ -129,7 +143,7 @@ int main(int argc, char const *argv[]){
 			std::cout << std::endl;
 		}
 */
-		stream_collide_save(f1_gpu, f2_gpu, fneq_gpu, rho_gpu, ux_gpu, uy_gpu, need_scalars);
+		stream_collide_save(f1_gpu, f2_gpu, feq_gpu, fneq_gpu, rho_gpu, ux_gpu, uy_gpu, need_scalars);
 
 		if(save){
 			save_scalar("rho",rho_gpu, scalar_host, n+1);
@@ -141,16 +155,20 @@ int main(int argc, char const *argv[]){
 		f1_gpu = f2_gpu;
 		f2_gpu = temp;
 
-		if(msg){
-			if(computeFlowProperties){
-				report_flow_properties(n+1, rho_gpu, ux_gpu, uy_gpu, prop_gpu, scalar_host);
-			}
+		conv_error = report_convergence(n+1, ux_gpu, ux_old_gpu, conv_host, conv_gpu, msg);
 
-			if(!quiet){
-				printf("Completed timestep %d\n", n+1);
-			}
+		end_step = n+1;
+		if(conv_error < erro_max && n > 2){
+			break;
 		}
+
+		checkCudaErrors(cudaMemcpy(ux_old_gpu, ux_gpu, mem_size_scalar, cudaMemcpyDeviceToDevice));
 	}
+
+	bool msg = 0 == 0;
+	std::cout << std::setw(10) << "Timestep" << std::setw(10) << "E" << std::setw(15) << "L2" << std::setw(23) << "Convergence" << std::endl;
+	fluid_prop = report_flow_properties(end_step, conv_error, rho_gpu, ux_gpu, uy_gpu, prop_gpu, scalar_host, msg);
+	save_terminal(end_step, conv_error, fluid_prop);
 	
 	// Measuring time
 	checkCudaErrors(cudaEventRecord(stop, 0));
@@ -192,10 +210,12 @@ int main(int argc, char const *argv[]){
 	// LBM variables
 	checkCudaErrors(cudaFree(f1_gpu));
 	checkCudaErrors(cudaFree(f2_gpu));
+	checkCudaErrors(cudaFree(feq_gpu));
 	checkCudaErrors(cudaFree(fneq_gpu));
 	checkCudaErrors(cudaFree(rho_gpu));
 	checkCudaErrors(cudaFree(ux_gpu));
 	checkCudaErrors(cudaFree(uy_gpu));
+	checkCudaErrors(cudaFree(ux_old_gpu));
 	checkCudaErrors(cudaFree(prop_gpu));
 	checkCudaErrors(cudaFree(ex_gpu));
 	checkCudaErrors(cudaFree(ey_gpu));
@@ -208,6 +228,7 @@ int main(int argc, char const *argv[]){
 
 	// Host arrays
 	checkCudaErrors(cudaFreeHost(scalar_host));
+	checkCudaErrors(cudaFreeHost(conv_host));
 
 	cudaDeviceReset();
 

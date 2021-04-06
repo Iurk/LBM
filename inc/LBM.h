@@ -3,9 +3,17 @@
 #include <iostream>
 #include <vector>
 
+extern __constant__ unsigned int q, Nx_d, Ny_d;
+extern __constant__ double rho0_d, u_max_d, nu_d;
+
+extern __constant__ double cs_d, w0_d, wp_d, ws_p;
+
+extern __device__ int *ex_d, ey_d*;
+extern __device__ bool *cylinder, *fluid;
+
 void initialization(double*, double);
 void init_equilibrium(double*, double*, double*, double*);
-void stream_collide_save(double*, double*, double*, double*, double*, double*, bool);
+void stream_collide_save(double*, double*, double*, double*, double*, double*, double*, bool);
 void compute_flow_properties(unsigned int, double*, double*, double*, double*, double*, double*);
 void report_flow_properties(unsigned int, double*, double*, double*, double*, double*);
 void save_scalar(const std::string , double*, double*, unsigned int);

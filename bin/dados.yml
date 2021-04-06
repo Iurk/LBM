@@ -10,9 +10,8 @@ simulation:
   NSTEPS: 10000
   NSAVE: 400
   NMSG: 1000
-  computeFlowProperties: true
-  quiet: true
   meshprint: false
+  erro_max: 1e-13
 
 gpu:
   nThreads: 32
