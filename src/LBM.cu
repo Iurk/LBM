@@ -43,7 +43,8 @@ __device__ __forceinline__ size_t gpu_fieldn_index(unsigned int x, unsigned int 
 }
 
 __global__ void gpu_init_equilibrium(double*, double*, double*, double*);
-__global__ void gpu_stream_collide_save(double*, double*, double*, double*, double*, double*, bool);
+__global__ void gpu_stream_collide_save(double*, double*, double*, double*, double*, double*, double*, bool);
+__global__ void gpu_compute_convergence(double*, double*, double*);
 __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, double*, double*);
 __global__ void gpu_print_mesh(int);
 __global__ void gpu_initialization(double*, double);
@@ -111,7 +112,7 @@ __device__ void gpu_equilibrium(unsigned int x, unsigned int y, double rho, doub
 	double A = 1.0/(cs2);
 	double B = 1.0/(2.0*cs4);
 
-	double W[] = {w0, wp, wp, wp, wp, ws, ws, ws, ws};
+	double W[] = {w0_d, wp_d, wp_d, wp_d, wp_d, ws_d, ws_d, ws_d, ws_d};
 	for(int n = 0; n < q; ++n){
 		
 		double ux2 = ux*ux;
@@ -133,7 +134,7 @@ __device__ void gpu_nonequilibrium(unsigned int x, unsigned int y, double tauxx,
 
 	double B = 1.0/(2.0*cs4);
 
-	double W[] = {w0, wp, wp, wp, wp, ws, ws, ws, ws};
+	double W[] = {w0_d, wp_d, wp_d, wp_d, wp_d, ws_d, ws_d, ws_d, ws_d};
 	for(int n = 0; n < q; ++n){
 		
 		double ex2 = ex_d[n]*ex_d[n];
@@ -203,7 +204,7 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, dou
 	v[gpu_scalar_index(x, y)] = uy;
 	
 	double cs2 = cs_d*cs_d;
-	double cs4 = cs2*cs2
+	double cs4 = cs2*cs2;
 
 	gpu_equilibrium(x, y, rho, ux, uy, feq);
 
@@ -225,7 +226,7 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, dou
 
 	// Collision Step
 	for(int n = 0; n < q; ++n){
-		f1[gpu_fieldn_index(x, y, n)] = feq[gpu_fieldn_index(x, y, n)] (1.0 - omega)*fneq[gpu_fieldn_index(x, y, n)];
+		f1[gpu_fieldn_index(x, y, n)] = feq[gpu_fieldn_index(x, y, n)] + (1.0 - omega)*fneq[gpu_fieldn_index(x, y, n)];
 	}
 
 	// Stream Step
@@ -235,134 +236,19 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, dou
 
 		f2[gpu_fieldn_index(x_att, y_att, n)] = f1[gpu_fieldn_index(x, y, n)];
 	}
-
-
-
-	bool node_fluid = fluid_d[gpu_scalar_index(x, y)];
-
-	if (node_fluid){
-		gpu_bounce_back(x, y, f2);
-	}
-
-	unsigned int idx_s = gpu_scalar_index(x, y);
-
-	if(x == 0){
-		unsigned int idx_1 = gpu_fieldn_index(x, y, 1);
-		unsigned int idx_5 = gpu_fieldn_index(x, y, 5);
-		unsigned int idx_8 = gpu_fieldn_index(x, y, 8);
-
-		gpu_zou_he_inlet(x, y, f2, &f2[idx_1], &f2[idx_5], &f2[idx_8], &r[idx_s], &u[idx_s], &v[idx_s]);
-	}
-
-	if(x == Nx_d-1){
-
-		int x_before = x - 1;
-		gpu_outflow(x, y, x_before, y, f2);
-	}
-
-	if(y == 0){
-
-		//int y_before = y + 1;
-		//gpu_outflow(x, y, x, y_before, f0, f2);
-
-		f2[gpu_fieldn_index(x, y, 2)] = f2[gpu_fieldn_index(x, y, 4)];
-		f2[gpu_fieldn_index(x, y, 5)] = f2[gpu_fieldn_index(x, y, 7)];
-		f2[gpu_fieldn_index(x, y, 6)] = f2[gpu_fieldn_index(x, y, 8)];
-	}
-
-	if(y == Ny_d-1){
-
-		//int y_before = y - 1;
-		//gpu_outflow(x, y, x, y_before, f0, f2);
-
-		f2[gpu_fieldn_index(x, y, 4)] = f2[gpu_fieldn_index(x, y, 2)];
-		f2[gpu_fieldn_index(x, y, 7)] = f2[gpu_fieldn_index(x, y, 5)];
-		f2[gpu_fieldn_index(x, y, 8)] = f2[gpu_fieldn_index(x, y, 6)];
-	}
 }
 
-__host__ double report_convergence(unsigned int t, double *u, double *u_old, double *conv_host, double *conv_gpu, bool msg){
+__host__ void report_flow_properties(unsigned int t, double *rho, double *ux, double *uy, double *prop_gpu, double *prop_host, bool msg){
 
-	double conv;
-	conv = compute_convergence(u, u_old, conv_host, conv_gpu);
+	double prop[1];
 
 	if(msg){
-		std::cout << std::setw(10) << t << std::setw(20) << conv << std::endl;
-	}
-
-	return conv;
-}
-
-__host__ double compute_convergence(double *u, double *u_old, double *conv_host, double *conv_gpu){
-
-	dim3 grid(1, Ny/nThreads, 1);
-	dim3 block(1, nThreads, 1);
-
-	gpu_compute_convergence<<< grid, block >>>(u, u_old, conv_gpu);
-	getLastCudaError("gpu_compute_convergence kernel error");
-
-	size_t conv_size_bytes = 2*grid.x*grid.y*sizeof(double);
-	checkCudaErrors(cudaMemcpy(conv_host, conv_gpu, conv_size_bytes, cudaMemcpyDeviceToHost));
-
-	double convergence;
-	double sumuxe2 = 0.0
-	double sumuxa2 = 0.0
-
-	for(unsigned int i = 0; i < grid.x*grid.y; ++i){
-		sumuxe2 += conv_host[2*i];
-		sumuxa2 += conv_host[2*i+1];
-	}
-
-	convergence = sqrt(sumuxe2/sumuxa2);
-	return convergence;
-}
-
-__global__ void gpu_compute_convergence(double *u, double *u_old, double *conv){
-
-	unsigned int y = blockIdx.y*blockDim.y + threadIdx.y;
-	unsigned int x = Nx_d/4;
-
-	extern __shared__ double data[];
-
-	double *uxe2 = data;
-	double *uxa2 = data + 1*blockDim.x;
-
-	double ux = u[gpu_scalar_index(x, y)];
-	double ux_old = u_old[gpu_scalar_index(x, y)];
-
-	uxe2[threadIdx.y] = (ux - ux_old)*(ux - ux_old);
-	uxa2[threadIdx.y] = ux_old*ux_old;
-
-	__syncthreads();
-
-	if(threadIdx.y == 0){
-
-		size_t idx = 2*(gridDim.x*blockIdx.y + blockIdx.x);
-
-		for(int n = 0; n < 2; ++n){
-			conv[idx+n] = 0.0;
-		}
-
-		for(int i = 0; i < blockDim.x; ++i){
-			conv[idx  ] += uxe2[i];
-			conv[idx+1] += uxa2[i];
-		}
+		compute_flow_properties(t, rho, ux, uy, prop, prop_gpu, prop_host);
+		std::cout << std::setw(10) << t << std::setw(13) << prop[0] << std::setw(15) << std::endl;
 	}
 }
 
-__host__ std::vector<double> report_flow_properties(unsigned int t, double conv, double *rho, double *ux, double *uy, double *prop_gpu, double *prop_host, bool msg){
-
-	std::vector<double> prop;
-
-	if(msg){
-		prop = compute_flow_properties(t, rho, ux, uy, prop, prop_gpu, prop_host);
-		std::cout << std::setw(10) << t << std::setw(13) << prop[0] << std::setw(15) << prop[1] << std::setw(20) << conv << std::endl;
-	}
-
-	return prop;
-}
-
-__host__ std::vector<double> compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop, double *prop_gpu, double *prop_host){
+__host__ void compute_flow_properties(unsigned int t, double *r, double *u, double *v, double* prop, double *prop_gpu, double *prop_host){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
@@ -374,16 +260,12 @@ __host__ std::vector<double> compute_flow_properties(unsigned int t, double *r, 
 	checkCudaErrors(cudaMemcpy(prop_host, prop_gpu, prop_size_bytes, cudaMemcpyDeviceToHost));
 
 	double E = 0.0;
-	double sumuxe2 = 0.0
-	double sumuxa2 = 0.0
 
 	for(unsigned int i = 0; i < grid.x*grid.y; ++i){
 		E += prop_host[i];
 	}
 
-	prop.push_back(E);
-
-	return prop;
+	prop[0] = E;
 }
 
 __global__ void gpu_compute_flow_properties(unsigned int t, double *r, double *u, double *v, double *prop_gpu){

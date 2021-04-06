@@ -8,14 +8,14 @@ extern __constant__ double rho0_d, u_max_d, nu_d;
 
 extern __constant__ double cs_d, w0_d, wp_d, ws_p;
 
-extern __device__ int *ex_d, ey_d*;
-extern __device__ bool *cylinder, *fluid;
+extern __device__ int *ex_d, *ey_d;
+extern __device__ bool *cylinder_d, *fluid_d;
 
 void initialization(double*, double);
 void init_equilibrium(double*, double*, double*, double*);
 void stream_collide_save(double*, double*, double*, double*, double*, double*, double*, bool);
+void report_flow_properties(unsigned int, double*, double*, double*, double*, double*, bool);
 void compute_flow_properties(unsigned int, double*, double*, double*, double*, double*, double*);
-void report_flow_properties(unsigned int, double*, double*, double*, double*, double*);
 void save_scalar(const std::string , double*, double*, unsigned int);
 void wrapper_input(unsigned int*, unsigned int*, double*, double*, double*, const double*);
 void wrapper_lattice(unsigned int*, double*, double*, double*, double*);
