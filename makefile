@@ -22,6 +22,7 @@ INCDIR := inc /usr/local/include
 OBJDIR := obj
 BINDIR := bin
 VELOCITY := bin/Velocity
+PRESSURE := bin/Pressure
 RESULTS := bin/Results
 MESH := bin/Mesh
 
@@ -38,23 +39,31 @@ C_DEP := $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.d, $(C_FILES))
 CU_DEP := $(patsubst $(SRCDIR)/%.cu, $(OBJDIR)/%.d, $(CU_FILES))
 CPP_DEP := $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.d, $(CPP_FILES))
 
-OBJ_COMP := $(CU_OBJ) $(CPP_OBJ)
-DEP_COMP := $(CU_DEP) $(CPP_DEP)
-
 OBJ := $(C_OBJ) $(CPP_OBJ) $(CU_OBJ)
 DEP := $(C_DEP) $(CPP_DEP) $(CU_DEP)
 
 # Flags
-INCDIRS = $(addprefix -I, $(INCDIR))
-LIBDIRS = $(addprefix -L, $(LIBDIR))
-LIB := $(addprefix -l, $(LIBRARY))
-CXXFLAGS := -std=c++11
-NVCCARCHFLAG := -arch $(ARCH)
-NVCCFLAGS := -v --ptxas-options=-v -O3 --device-c # Para debug flag -g -G e executar com cuda-memcheck ./lbm |more
+NVCCARCHFLAG := -arch sm_61
+NVCCFLAGS := -std=c++11 -v --ptxas-options=-v -O3 --device-c # Para debug flag -g -G e executar com cuda-memcheck ./lbm |more
+LDFLAGS := $(addprefix -L, $(LIBDIR))
 DEPFLAGS := -MMD
 
-COMPILE.c = $(NVCC) $(DEPFLAGS) -g $(INCDIRS) -c
-COMPILE.cpp = $(NVCC) $(DEPFLAGS) $(CXXFLAGS) $(INCDIRS) $(NVCCARCHFLAG) $(NVCCFLAGS)
+INCLUDES := $(addprefix -I, $(INCDIR))
+LIBRARIES := $(addprefix -l, $(LIBRARY))
+
+ALL_CPFLAGS := $(DEPFLAGS)
+ALL_CPFLAGS += $(NVCCARCHFLAG)
+ALL_CPFLAGS += $(NVCCFLAGS)
+
+ALL_LDFLAGS := $(LDFLAGS)
+
+CXXFLAGS := -std=c++11
+NVCCARCHFLAG := -arch $(ARCH)
+NVCCFLAGS := -v --ptxas-options=-v -O3 # Para debug flag -g -G e executar com cuda-memcheck ./lbm |more
+
+COMPILE.c = $(NVCC) $(DEPFLAGS) -g $(INCLUDES) -c
+COMPILE.cpp = $(NVCC) $(ALL_CPFLAGS) $(INCLUDES) --device-c
+COMPILE.cu = $(NVCC) $(ALL_CPFLAGS) $(INCLUDES) --device-c
 
 .PHONY: all clean mesh plot refresh run
 
@@ -62,8 +71,8 @@ all: $(EXE)
 
 # Linkage
 $(EXE): $(OBJ)
-	$(NVCC) $(NVCCARCHFLAG) $(CXXFLAGS) $(LIBDIRS) $^ -o $@ $(LIB)
-
+	$(NVCC) $(NVCCARCHFLAG) $(INCLUDES) $(ALL_LDFLAGS) $^ -o $@ $(LIBRARIES)
+	
 $(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
 	$(COMPILE.c) $< -o $@
 
@@ -71,7 +80,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
 	$(COMPILE.cpp) $< -o $@
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cu | $(OBJDIR)
-	$(COMPILE.cpp) $< -o $@
+	$(COMPILE.cu) $< -o $@
 
 $(OBJDIR):
 	@mkdir -p $@
@@ -81,11 +90,12 @@ clean:
 	@echo Cleaning up...
 	@rm -f -r $(OBJDIR)
 	@rm -f -r $(VELOCITY)/*
+	@rm -f -r $(PRESSURE)/*
 	@rm -f -r $(RESULTS)/*
 	@rm -f -r $(MESH)/*
 	@rm -f $(EXE)
-	@rm -f *.gif
-	@rm -f *.mp4
+	@rm -f $(BINDIR)/*.gif
+	@rm -f $(BINDIR)/*.mp4
 	@echo Done!
 
 mesh:
@@ -99,8 +109,11 @@ plot:
 refresh:
 	@echo Cleaning up the images...
 	@rm -f -r $(VELOCITY)/*
+	@rm -f -r $(PRESSURE)/*
 	@echo Cleaning up the results...
 	@rm -f -r $(RESULTS)/*
+	@rm -f $(BINDIR)/*.gif
+	@rm -f $(BINDIR)/*.mp4
 	@echo Cleaning up the mesh...
 	@rm -f -r $(MESH)/*
 	@echo Done!
