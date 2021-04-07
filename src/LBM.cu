@@ -43,7 +43,7 @@ __device__ __forceinline__ size_t gpu_fieldn_index(unsigned int x, unsigned int 
 }
 
 __global__ void gpu_init_equilibrium(double*, double*, double*, double*);
-__global__ void gpu_stream_collide_save(double*, double*, double*, double*, double*, double*, double*, bool);
+__global__ void gpu_stream_collide_save(double*, double*, double*, double*, double*, double*, double*, double*, bool);
 __global__ void gpu_compute_convergence(double*, double*, double*);
 __global__ void gpu_compute_flow_properties(unsigned int, double*, double*, double*, double*);
 __global__ void gpu_print_mesh(int);
@@ -95,6 +95,25 @@ __device__ void gpu_nonequilibrium(unsigned int x, unsigned int y, double tauxx,
 
 }
 
+// Source Term
+__device__ void gpu_source(unsigned int x, unsigned int y, double gx, double gy, double rho, double ux, double uy, double *S){
+
+	double cs2 = cs_d*cs_d;
+
+	double A = 1.0/(cs2);
+
+	double W[] = {w0_d, wp_d, wp_d, wp_d, wp_d, ws_d, ws_d, ws_d, ws_d};
+	for(int n = 0; n < q; ++n){
+		double gdotei = gx*ex_d[n] + gy*ey_d[n];
+		double udotei = ux*ex_d[n] + uy*ey_d[n];
+
+		double order_1 = gx*(ex_d[n] - ux) + gy*(ey_d[n] - uy);
+		double order_2 = 0.0;
+
+		S[gpu_fieldn_index(x, y, n)] = A*W[n]*rho*(order_1 + order_2);
+	}
+}
+
 __host__ void init_equilibrium(double *f1, double *r, double *u, double *v){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
@@ -116,7 +135,7 @@ __global__ void gpu_init_equilibrium(double *f1, double *r, double *u, double *v
 	gpu_equilibrium(x, y, rho, ux, uy, f1);
 }
 
-__host__ void stream_collide_save(double *f1, double *f2, double *feq, double *fneq, double *r, double *u, double *v, bool save){
+__host__ void stream_collide_save(double *f1, double *f2, double *feq, double *fneq, double *S, double *r, double *u, double *v, bool save){
 
 	dim3 grid(Nx/nThreads, Ny, 1);
 	dim3 block(nThreads, 1, 1);
@@ -124,11 +143,11 @@ __host__ void stream_collide_save(double *f1, double *f2, double *feq, double *f
 	//dim3 grid(1,1,1);
 	//dim3 block(1,1,1);
 
-	gpu_stream_collide_save<<< grid, block >>>(f1, f2, feq, fneq, r, u, v, save);
+	gpu_stream_collide_save<<< grid, block >>>(f1, f2, feq, fneq, S, r, u, v, save);
 	getLastCudaError("gpu_stream_collide_save kernel error");
 }
 
-__global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, double *fneq, double *r, double *u, double *v, bool save){
+__global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, double *fneq, double *S, double *r, double *u, double *v, bool save){
 
 	const double omega = 1.0/tau_d;
 
@@ -137,6 +156,9 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, dou
 
 	unsigned int x_att, y_att;
 
+	const double gx = 1e-6;
+	const double gy = 0.0;
+
 	double rho = 0, ux_i = 0, uy_i = 0;
 	for(int n = 0; n < q; ++n){
 		rho += f1[gpu_fieldn_index(x, y, n)];
@@ -144,8 +166,8 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, dou
 		uy_i += f1[gpu_fieldn_index(x, y, n)]*ey_d[n];
 	}
 
-	double ux = ux_i/rho;
-	double uy = uy_i/rho;
+	double ux = (ux_i + 0.5*rho*gx)/rho;
+	double uy = (uy_i + 0.5*rho*gy)/rho;
 
 	r[gpu_scalar_index(x, y)] = rho;
 	u[gpu_scalar_index(x, y)] = ux;
@@ -174,7 +196,7 @@ __global__ void gpu_stream_collide_save(double *f1, double *f2, double *feq, dou
 
 	// Collision Step
 	for(int n = 0; n < q; ++n){
-		f1[gpu_fieldn_index(x, y, n)] = feq[gpu_fieldn_index(x, y, n)] + (1.0 - omega)*fneq[gpu_fieldn_index(x, y, n)];
+		f1[gpu_fieldn_index(x, y, n)] = feq[gpu_fieldn_index(x, y, n)] + (1.0 - omega)*fneq[gpu_fieldn_index(x, y, n)] + (1.0 - 0.5*omega)*S[gpu_fieldn_index(x, y, n)];
 	}
 
 	// Stream Step

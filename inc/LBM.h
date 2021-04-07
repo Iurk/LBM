@@ -13,7 +13,7 @@ extern __device__ bool *cylinder_d, *fluid_d;
 
 void initialization(double*, double);
 void init_equilibrium(double*, double*, double*, double*);
-void stream_collide_save(double*, double*, double*, double*, double*, double*, double*, bool);
+void stream_collide_save(double*, double*, double*, double*, double*, double*, double*, double*, bool);
 void report_flow_properties(unsigned int, double*, double*, double*, double*, double*, bool);
 void compute_flow_properties(unsigned int, double*, double*, double*, double*, double*, double*);
 void save_scalar(const std::string , double*, double*, unsigned int);
